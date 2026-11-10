@@ -1,5 +1,9 @@
 # archpilot
 
+[![npm](https://img.shields.io/npm/v/archpilot-mcp)](https://www.npmjs.com/package/archpilot-mcp)
+[![CI](https://github.com/saimsheikh/archpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/saimsheikh/archpilot/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 **Plan before you code.** An MCP server and Claude Code skill that interviews you about your
 idea, runs a pre-mortem, and writes a validated architecture diagram plus an
 `ARCHITECTURE.md` your coding agent follows as a contract.
@@ -12,25 +16,24 @@ ask the questions you forgot first (scale, budget, data sensitivity, the one thi
 not fail), weigh trade-offs out loud, and name the top five ways the design will fail. Then
 it turns the plan into a contract the agent must flag deviations from.
 
-> **Status: v0.1, early.** Greenfield planning only. Not yet published to npm: until the
-> first release, [install from source](#from-source).
+> **Status: v0.1, early.** Greenfield planning only. Feedback and pattern requests are very
+> welcome in [issues](https://github.com/saimsheikh/archpilot/issues).
 
 ## 60-second quickstart
 
-Needs Node.js 22.13+ and Claude Code.
+Needs Node.js 22.13+ and [Claude Code](https://claude.com/claude-code).
 
 ```bash
-# 1. Chromium for diagram rendering (one time)
-npx puppeteer browsers install chrome-headless-shell
+# 1. Install headless Chromium (for diagrams) and the planning skill
+npx -y archpilot-mcp setup
 
-# 2. The MCP server (all projects)
+# 2. Add the MCP server to Claude Code, for all projects
 claude mcp add --scope user archpilot -- npx -y archpilot-mcp
-
-# 3. The planning skill (all projects)
-npx -y archpilot-mcp install-skill
 ```
 
-Restart Claude Code, open an empty project folder and say:
+Check it is connected with `claude mcp list` (or `/mcp` inside Claude Code); you should see
+`archpilot: npx -y archpilot-mcp - ✔ Connected`. Then restart Claude Code, open an empty
+project folder and say:
 
 > Plan the architecture for a booking app for physiotherapy clinics before we write code.
 
@@ -96,10 +99,14 @@ three failure modes with mitigations, what not to use it for, and a render-teste
 ### npm
 
 ```bash
+npx -y archpilot-mcp setup                                      # Chromium + skill (all projects)
+npx -y archpilot-mcp setup --project                            # or: skill for this project only
 claude mcp add --scope user archpilot -- npx -y archpilot-mcp   # MCP server
-npx -y archpilot-mcp install-skill                              # skill, all projects
-npx -y archpilot-mcp install-skill --project                    # or: this project only
 ```
+
+`setup` runs `install-browser` and `install-skill`, which also work on their own. Run
+`npx -y archpilot-mcp --help` for all commands. To upgrade, run `setup` again: `npx -y`
+fetches the latest version and the skill is replaced in place.
 
 Other MCP clients: run `npx -y archpilot-mcp` as a stdio server. It writes files inside the
 directory it is started in (override with `ARCHPILOT_PROJECT_ROOT`).
@@ -110,18 +117,18 @@ directory it is started in (override with `ARCHPILOT_PROJECT_ROOT`).
 git clone https://github.com/saimsheikh/archpilot.git
 cd archpilot
 npm install
-npx puppeteer browsers install chrome-headless-shell
 npm run build
+node dist/index.js setup
 claude mcp add --scope user archpilot -- node "$PWD/dist/index.js"
-node dist/index.js install-skill
 ```
 
 ### Headless Chromium
 
 mermaid-cli renders through Puppeteer. Recent npm versions skip install scripts, so the
-browser may not download automatically; `npx puppeteer browsers install chrome-headless-shell`
-fixes that. If it is missing, tools return `RENDERER_UNAVAILABLE` with that command as the
-hint.
+browser does not download automatically. `npx -y archpilot-mcp install-browser` (part of
+`setup`) installs the exact build archpilot's Puppeteer expects; a plain
+`npx puppeteer browsers install` may fetch a different version. If the browser is missing,
+tools return `RENDERER_UNAVAILABLE` with that command as the hint.
 
 On Linux containers or CI running as root, Chromium needs its sandbox disabled:
 
@@ -151,6 +158,16 @@ export ARCHPILOT_PUPPETEER_CONFIG="$PWD/puppeteer.json"
   escapes are rejected.
 - Errors never contain stack traces or local paths; details go to stderr.
 - Renders have a timeout, size limits and a concurrency cap.
+
+## Troubleshooting
+
+| Symptom                                             | Fix                                                                                                             |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Tools return `RENDERER_UNAVAILABLE`                 | `npx -y archpilot-mcp install-browser`                                                                          |
+| `claude mcp list` shows archpilot failed to connect | Check `node --version` is 22.13+, then run `npx -y archpilot-mcp --version` in a terminal to see the real error |
+| Renders fail on Linux as root / in Docker           | Disable the Chromium sandbox, see [Headless Chromium](#headless-chromium)                                       |
+| The skill does not trigger                          | Restart Claude Code after `setup`; ask explicitly, e.g. "plan the architecture for X before we code"            |
+| Files land in the wrong folder                      | The server writes inside the directory Claude Code was started in; set `ARCHPILOT_PROJECT_ROOT` to override     |
 
 ## Evals
 

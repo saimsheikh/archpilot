@@ -54,6 +54,9 @@ try {
     `--version prints ${version}`,
   );
 
+  execFileSync(process.execPath, [bin, "install-browser"], { cwd: project, stdio: "ignore" });
+  check(true, "install-browser resolves the bundled puppeteer and exits 0");
+
   execFileSync(process.execPath, [bin, "install-skill", "--project"], { cwd: project });
   const skill = await readFile(join(project, ".claude", "skills", "archpilot", "SKILL.md"), "utf8");
   check(skill.includes("name: archpilot"), "install-skill --project writes the skill");

@@ -11,7 +11,7 @@ generic diagram tool.
 git clone https://github.com/saimsheikh/archpilot.git
 cd archpilot
 npm install
-npx puppeteer browsers install chrome-headless-shell   # Chromium for mermaid-cli
+npm run build && node dist/index.js install-browser   # Chromium for mermaid-cli
 npm test
 ```
 

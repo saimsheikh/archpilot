@@ -50,7 +50,7 @@ export function parseMermaidError(stderr: string, source: string): DiagramError 
     return {
       code: "RENDERER_UNAVAILABLE",
       message: "Headless Chromium for mermaid-cli is not installed.",
-      hint: "Run: npx puppeteer browsers install chrome-headless-shell",
+      hint: "Run: npx -y archpilot-mcp install-browser",
     };
   }
   if (UNKNOWN_TYPE_PATTERN.test(stderr)) {
