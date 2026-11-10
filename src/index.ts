@@ -30,17 +30,20 @@ async function startServer(): Promise<void> {
 
 async function main(args: readonly string[]): Promise<void> {
   const [command, ...rest] = args;
-  if (command === undefined) return startServer();
-  if (command === "--version") return void console.log(VERSION);
-  if (command === "--help" || command === "-h") return void console.log(USAGE);
-  if (command === "install-skill") {
+  if (command === undefined) {
+    await startServer();
+  } else if (command === "--version") {
+    console.log(VERSION);
+  } else if (command === "--help" || command === "-h") {
+    console.log(USAGE);
+  } else if (command === "install-skill") {
     const target = skillTarget(rest.includes("--project") ? "project" : "user", process.cwd());
     await installSkill(target);
     console.log(`Installed the archpilot skill to ${target}`);
-    return;
+  } else {
+    console.error(`Unknown command '${command}'.\n\n${USAGE}`);
+    process.exitCode = 2;
   }
-  console.error(`Unknown command '${command}'.\n\n${USAGE}`);
-  process.exitCode = 2;
 }
 
 main(process.argv.slice(2)).catch((error: unknown) => {

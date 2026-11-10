@@ -8,3 +8,4 @@ evals/**/results.*
 evals/runs
 evals/results
 examples/*/ARCHITECTURE.md
+docs/launch
