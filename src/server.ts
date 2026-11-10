@@ -8,9 +8,9 @@ import type { PatternRetriever } from "./services/retrieval/pattern-retriever.js
 import { registerArchitectureTools } from "./tools/architecture-tools.js";
 import { registerDiagramTools } from "./tools/diagram-tools.js";
 import { registerPatternTools } from "./tools/pattern-tools.js";
+import { VERSION } from "./version.js";
 
 export const SERVER_NAME = "archpilot";
-export const SERVER_VERSION = "0.1.0";
 
 export interface ServerDependencies {
   renderer: DiagramRenderer;
@@ -22,7 +22,7 @@ export interface ServerDependencies {
 
 /** Builds the server with all tools registered, independent of transport so tests can reuse it. */
 export function createServer(deps: ServerDependencies): McpServer {
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+  const server = new McpServer({ name: SERVER_NAME, version: VERSION });
   registerDiagramTools(server, new DiagramService(deps.renderer, deps.projectRoot));
   registerArchitectureTools(server, new ArchitectureService(deps.projectRoot));
   registerPatternTools(server, new PatternService(deps.patterns, deps.retriever));

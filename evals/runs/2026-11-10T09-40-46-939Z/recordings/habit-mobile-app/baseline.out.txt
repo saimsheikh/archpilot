@@ -1,0 +1,84 @@
+```mermaid
+flowchart TB
+    subgraph Clients["Mobile clients (offline-first)"]
+        iOS["iOS app"]
+        Android["Android app"]
+        LocalDB[("Local SQLite<br/>habits, check-ins, streaks")]
+        LocalNotif["Local scheduled<br/>reminders"]
+        iOS --- LocalDB
+        Android --- LocalDB
+        iOS --- LocalNotif
+        Android --- LocalNotif
+    end
+
+    subgraph Stores["App stores"]
+        Apple["App Store<br/>StoreKit 2"]
+        Google["Google Play<br/>Billing"]
+    end
+
+    subgraph Backend["Backend"]
+        CDN["CDN / WAF"]
+        API["API service<br/>(stateless, 2+ instances)"]
+        Auth["Auth<br/>(Sign in with Apple, Google, email)"]
+        Sync["Sync endpoints<br/>(delta push/pull, last-write-wins)"]
+        Entitle["Entitlement service<br/>(receipt validation, premium flag)"]
+        Worker["Background workers<br/>(queue consumers)"]
+        Sched["Scheduler<br/>(cron: nudges, streak-risk pushes)"]
+        Queue[["Job queue"]]
+        DB[("PostgreSQL<br/>users, habits, check-ins,<br/>entitlements")]
+        Cache[("Redis<br/>sessions, rate limits")]
+    end
+
+    subgraph Push["Push providers"]
+        APNs["APNs"]
+        FCM["Firebase Cloud Messaging"]
+    end
+
+    subgraph Ops["Observability"]
+        Logs["Logs + metrics + alerts"]
+        Crash["Crash reporting"]
+        Analytics["Product analytics"]
+    end
+
+    iOS & Android -->|HTTPS| CDN --> API
+    API --> Auth
+    API --> Sync
+    API --> Entitle
+    Auth --> DB
+    Sync --> DB
+    Entitle --> DB
+    API --> Cache
+
+    iOS -->|purchase| Apple
+    Android -->|purchase| Google
+    iOS & Android -->|send receipt/token| Entitle
+    Apple -->|server notifications| Entitle
+    Google -->|RTDN via Pub/Sub| Entitle
+    Entitle -->|verify| Apple
+    Entitle -->|verify| Google
+
+    Sched --> Queue
+    API --> Queue
+    Queue --> Worker
+    Worker --> DB
+    Worker --> APNs
+    Worker --> FCM
+    APNs --> iOS
+    FCM --> Android
+
+    API -.-> Logs
+    Worker -.-> Logs
+    iOS & Android -.-> Crash
+    iOS & Android -.-> Analytics
+```
+
+**Key decisions**
+
+- **Offline-first.** The core loop (check in, see streaks) works against local SQLite. Sync is optional and runs in the background, so the backend isn't on the critical path.
+- **Reminders are local notifications.** Daily habit reminders are scheduled on-device, which is more reliable and cheaper than server push, and they work offline. Server push (APNs/FCM) is only for streak-at-risk nudges, re-engagement, and sync wake-ups.
+- **Streaks computed from check-ins.** Store check-ins with the user's local date and timezone, and derive streaks from them rather than storing a counter. This avoids timezone and multi-device conflicts.
+- **Sync is simple.** Per-record `updated_at` with last-write-wins and tombstones for deletes. Habit data rarely conflicts, so CRDTs aren't worth the cost.
+- **Subscriptions are server-verified.** The client sends the purchase, and the server validates it with Apple/Google and also listens to their server notifications (renewals, refunds, grace period). The server sets the premium flag. If you'd rather not build this, RevenueCat can replace the entitlement service.
+- **Sized for 200k MAU.** This is modest load: a single Postgres primary (with a read replica or PITR backups), a small Redis, and 2+ stateless API instances behind a load balancer. No microservices or Kafka needed. Sync is the main write load, and it's bursty around morning and evening check-in times.
+
+Say the word if you want a deployment view (AWS/GCP), a data model/ER diagram, or the sync and purchase flows as sequence diagrams.

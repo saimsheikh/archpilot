@@ -1,0 +1,58 @@
+```mermaid
+flowchart TB
+    subgraph Clients
+        Host["Host Web App<br/>(create / run quiz)"]
+        Player["Player Mobile Web<br/>(join code, answer, leaderboard)"]
+    end
+
+    CDN["CDN<br/>static assets"]
+    LB["Load Balancer<br/>sticky WebSocket + HTTPS"]
+
+    subgraph App["Application Tier (stateless, horizontally scalable)"]
+        API["REST API<br/>auth, quiz CRUD, create session, join code lookup"]
+        WS["Realtime Gateway<br/>WebSocket nodes"]
+        Engine["Game Engine<br/>state machine, 20s question timer,<br/>server-authoritative"]
+        Scoring["Scoring<br/>correctness + speed bonus"]
+    end
+
+    subgraph Data["Data Tier"]
+        Redis[("Redis<br/>live session state, player roster,<br/>answers, leaderboard sorted set")]
+        PubSub{{"Redis Pub/Sub<br/>fan-out across gateway nodes"}}
+        DB[("PostgreSQL<br/>users, quizzes, questions,<br/>final results")]
+    end
+
+    Host -->|load app| CDN
+    Player -->|load app| CDN
+    Host -->|HTTPS| LB
+    Player -->|HTTPS + WSS| LB
+    LB --> API
+    LB --> WS
+
+    API --> DB
+    API -->|create session + join code| Redis
+
+    WS -->|join, answer events| Engine
+    Engine -->|load questions at start| DB
+    Engine --> Scoring
+    Scoring -->|ZINCRBY| Redis
+    Engine <-->|session state| Redis
+    Engine -->|publish: question, timer end, leaderboard| PubSub
+    PubSub -->|broadcast| WS
+    WS -->|push to up to 500 players + host| Player
+    WS -->|push control and results| Host
+    Engine -->|persist results on quiz end| DB
+```
+
+**Flow**
+1. The host signs in through the REST API, picks a quiz, and starts a session. A short join code is stored in Redis.
+2. Players enter the code, the API validates it, and each player opens a WebSocket to the gateway.
+3. For each question, the engine publishes it through Pub/Sub, and every gateway node pushes it to its connected players. The 20s timer runs on the server, so client clocks don't matter.
+4. Answers arrive over the WebSocket, and the scoring step updates the Redis sorted set. When the timer ends, the engine publishes the updated top ranks, and the gateways push them to everyone.
+5. At the end of the quiz, final results are written to PostgreSQL.
+
+**Design choices**
+- **Redis for live state:** the leaderboard and answers are ephemeral and write-heavy, and sorted sets make ranking cheap.
+- **Pub/Sub fan-out:** any gateway node can serve any player, so you can scale out. 500 players fit on a single node, but this avoids a rewrite later.
+- **Server-side timer:** this prevents cheating and clock drift.
+
+If you want a sequence diagram of one question round, or a deployment view (containers, regions), I can draw either.

@@ -1,0 +1,3 @@
+Draw me an architecture diagram for this project. Use Mermaid.
+
+Project: An internal tool for 60 warehouse and support staff to look up orders, change shipping addresses, issue refunds up to a limit, and see an audit trail of every change. Must use the company's Google Workspace login.

@@ -1,0 +1,56 @@
+```mermaid
+flowchart LR
+    subgraph Sources
+        POS["120 Store POS Systems"]
+        ECOM[("E-commerce DB")]
+        MKT["Marketing Platform API"]
+    end
+
+    SCHED["Orchestrator<br/>(nightly schedule + weekly forecast trigger)"]
+
+    subgraph Ingestion
+        EXT_POS["POS Extractors<br/>(per-store, retry + late-store handling)"]
+        EXT_ECOM["DB Extractor<br/>(incremental / CDC)"]
+        EXT_MKT["API Extractor"]
+    end
+
+    subgraph Storage
+        RAW[("Raw Landing Zone<br/>object storage, partitioned by date")]
+        STG["Staging<br/>clean, dedupe, validate, standardize"]
+        WH[("Data Warehouse<br/>joined sales, product, store, campaign")]
+    end
+
+    subgraph Forecasting["Weekly Demand Forecast"]
+        FEAT["Feature Builder"]
+        MODEL["Forecast Model<br/>per product"]
+        FC[("Forecast Tables")]
+    end
+
+    BI["BI Dashboards"]
+    MON["Monitoring and Alerts<br/>data quality, missing stores, job failures"]
+
+    SCHED --> EXT_POS & EXT_ECOM & EXT_MKT
+    POS --> EXT_POS
+    ECOM --> EXT_ECOM
+    MKT --> EXT_MKT
+
+    EXT_POS & EXT_ECOM & EXT_MKT --> RAW
+    RAW --> STG --> WH
+
+    WH --> BI
+    WH --> FEAT --> MODEL --> FC
+    FC --> WH
+    FC --> BI
+
+    SCHED -.-> MON
+    STG -.-> MON
+    MODEL -.-> MON
+```
+
+**Assumptions I made, since the brief didn't specify:**
+- **Raw landing zone:** Raw data is kept before any cleaning, so a bad transform can be replayed without re-pulling from 120 stores.
+- **Per-store extraction with retries:** Some POS systems will be offline or late at night. Monitoring flags missing stores instead of failing the whole run.
+- **Forecast output:** Forecasts are written back into the warehouse, so dashboards read one place.
+- **Weekly forecast:** It runs off the same warehouse, triggered weekly by the orchestrator rather than nightly.
+
+If you tell me the cloud or tooling (e.g. Airflow, dbt, Snowflake, BigQuery), I can relabel the boxes with concrete technologies.

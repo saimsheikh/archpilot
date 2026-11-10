@@ -5,7 +5,7 @@ import {
   parsePattern,
   PatternFormatError,
 } from "../../src/patterns/pattern-loader.js";
-import { MermaidRenderer } from "../../src/renderers/mermaid/mermaid-renderer.js";
+import { createTestRenderer } from "../helpers/renderer.js";
 
 const patterns = await loadPatterns();
 const EXPECTED_IDS = [
@@ -34,7 +34,7 @@ describe("bundled patterns", () => {
       });
 
       it("has a diagram that renders", { timeout: 90_000 }, async () => {
-        const result = await new MermaidRenderer().validate(pattern.mermaid);
+        const result = await createTestRenderer().validate(pattern.mermaid);
         expect(result).toMatchObject({ ok: true });
       });
     });

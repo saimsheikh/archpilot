@@ -1,0 +1,29 @@
+name: Bug report
+description: Something in the MCP server or the skill does not work as documented.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the tool call and the structured error (`code`, `message`, `hint`) if there was one.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: diagram
+    attributes:
+      label: Mermaid source (if a diagram was involved)
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: archpilot-mcp version (`archpilot-mcp --version`), Node version, OS, MCP client.
+    validations:
+      required: true

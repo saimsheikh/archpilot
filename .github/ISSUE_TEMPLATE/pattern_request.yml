@@ -1,0 +1,27 @@
+name: Pattern request
+description: Propose a new reference architecture for the pattern library.
+labels: [pattern]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Pattern name
+      placeholder: e.g. Two-sided marketplace
+    validations:
+      required: true
+  - type: textarea
+    id: when
+    attributes:
+      label: When to use it (and when not to)
+    validations:
+      required: true
+  - type: textarea
+    id: failure-modes
+    attributes:
+      label: At least three realistic failure modes
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: A project description that should retrieve this pattern

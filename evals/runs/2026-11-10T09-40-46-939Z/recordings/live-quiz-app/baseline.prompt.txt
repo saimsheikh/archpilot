@@ -1,0 +1,3 @@
+Draw me an architecture diagram for this project. Use Mermaid.
+
+Project: A live quiz app for classrooms and events: a host runs a quiz, up to 500 players join with a code on their phones, answer within 20 seconds, and see a live leaderboard update after each question.

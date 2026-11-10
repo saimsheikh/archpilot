@@ -1,0 +1,227 @@
+```json
+{
+  "mermaid": "flowchart LR\n  pos[(\"120 store POS systems\")] --> pull[\"Store extract jobs\"]\n  ecom[(\"E-commerce DB read replica\")] --> pull\n  mkt[\"Marketing platform API\"] --> saas[\"Managed SaaS connector\"]\n  pull --> raw[(\"Raw zone: object storage\")]\n  saas --> raw\n  orch[\"Orchestrator\"] -.-> pull\n  orch -.-> saas\n  orch -.-> transform\n  orch -.-> forecast\n  raw --> contract{\"Source contract checks\"}\n  contract -->|pass| transform[\"dbt transforms: clean and join\"]\n  contract -->|fail| alerts[\"Alerts\"]\n  transform --> quality{\"Quality checks\"}\n  quality -->|pass| warehouse[(\"Warehouse\")]\n  quality -->|fail| alerts\n  warehouse --> bi[\"BI dashboards\"]\n  warehouse --> features[(\"Feature tables\")]\n  features --> forecast[\"Weekly forecast job\"]\n  forecast --> registry[(\"Model registry\")]\n  forecast --> predictions[(\"Forecast table\")]\n  predictions --> bi\n  forecast --> alerts\n  orch -.-> alerts\n  secrets[\"Secret manager\"] -.-> pull\n  secrets -.-> saas",
+  "architecture": {
+    "title": "Retail Nightly Sales Pipeline and Demand Forecast",
+    "summary": "A nightly batch ELT pipeline for a retail chain. It extracts sales from 120 store POS systems, the e-commerce database and a marketing platform, lands the data unchanged in object storage, cleans and joins it with tested dbt models in a warehouse, and publishes it to BI dashboards. A weekly job trains and runs a per-product demand forecast from shared feature tables and writes predictions to a table that dashboards and planners read. Users are analysts, merchandisers and supply planners. Scale is modest (120 stores, nightly), so the design is batch only, with no streaming and no online model serving.",
+    "components": [
+      {
+        "name": "Store extract jobs",
+        "responsibility": "Pull the previous business day's sales from each of the 120 POS systems and the e-commerce read replica, using incremental watermarks. Each store runs as an independent task so one offline store does not block the rest. Writes are idempotent (partitioned by store and date, overwrite on retry).",
+        "technology": "Python tasks run by the orchestrator; POS access via VPN or an agent at each store, depending on the POS vendor"
+      },
+      {
+        "name": "Managed SaaS connector",
+        "responsibility": "Sync marketing platform data (campaigns, spend, attribution) into the raw zone without custom code.",
+        "technology": "Managed ELT connector such as Fivetran or Airbyte"
+      },
+      {
+        "name": "Raw zone",
+        "responsibility": "Immutable, partitioned copy of source data exactly as received, with versioning enabled. Allows replay and backfills without re-hitting the POS systems.",
+        "technology": "Object storage (S3/GCS/Azure Blob), Parquet or JSON, lifecycle rules"
+      },
+      {
+        "name": "Source contract checks",
+        "responsibility": "Validate expected columns, types, store coverage (all 120 stores present) and row-count bounds before transforming. Fails loudly on schema drift instead of coercing.",
+        "technology": "Great Expectations or dbt source tests with freshness"
+      },
+      {
+        "name": "dbt transforms",
+        "responsibility": "Clean, deduplicate, normalize (currency, time zones, product IDs) and join POS, e-commerce and marketing data into staging, core and mart models. Incremental models on date partitions.",
+        "technology": "dbt Core on the warehouse"
+      },
+      {
+        "name": "Quality checks",
+        "responsibility": "dbt tests plus freshness, row-count and reconciliation checks (for example, daily totals versus store-reported totals). Dashboards and forecast only read data after checks pass; otherwise the previous good data stays published.",
+        "technology": "dbt tests, elementary or Great Expectations"
+      },
+      {
+        "name": "Warehouse",
+        "responsibility": "Serves curated models for BI and holds feature tables. Partitioned by date, with budgets and query cost limits.",
+        "technology": "Managed cloud warehouse (BigQuery, Snowflake or Redshift)"
+      },
+      {
+        "name": "Feature tables",
+        "responsibility": "Per-product weekly features (lagged sales, promotions, price, stock-outs, seasonality, marketing spend) defined once in a shared SQL/dbt definition used for both training and inference.",
+        "technology": "dbt models in the warehouse"
+      },
+      {
+        "name": "Weekly forecast job",
+        "responsibility": "Trains or refreshes per-product demand models, evaluates them against the current champion on a holdout, promotes only if better, and writes next-week forecasts to the forecast table. Falls back to the last good forecast or a seasonal-naive baseline on failure.",
+        "technology": "Python (LightGBM / statsforecast) run as an orchestrator task"
+      },
+      {
+        "name": "Model registry",
+        "responsibility": "Versions models, metrics and the feature set used; tracks the champion.",
+        "technology": "MLflow or the warehouse platform's registry"
+      },
+      {
+        "name": "Forecast table",
+        "responsibility": "Batch predictions per product, store group and week, with model version and generation timestamp.",
+        "technology": "Warehouse table"
+      },
+      {
+        "name": "BI dashboards",
+        "responsibility": "Sales, margin, marketing performance and forecast-versus-actual views. Access via company SSO with role-based access to datasets.",
+        "technology": "Managed BI tool (Looker Studio, Power BI, Metabase or similar)"
+      },
+      {
+        "name": "Orchestrator",
+        "responsibility": "Schedules the nightly DAG and the weekly forecast, handles dependencies, bounded retries with backoff, backfills and per-task timeouts, and exposes run history.",
+        "technology": "Managed Airflow, Dagster or Prefect"
+      },
+      {
+        "name": "Alerts",
+        "responsibility": "Pages or notifies a named owner on failed or late runs, failed checks, missing stores, forecast accuracy degradation and budget overruns. Failed tasks stay visible in the orchestrator as the dead-letter view. Includes a data-ready-by-time SLA alert.",
+        "technology": "Slack/email/PagerDuty via orchestrator and warehouse alerting"
+      },
+      {
+        "name": "Secret manager",
+        "responsibility": "Holds POS, replica, SaaS and warehouse credentials with rotation. Jobs use service accounts or workload identity, with least-privilege roles (read-only on sources).",
+        "technology": "Cloud secret manager"
+      }
+    ],
+    "dataFlow": [
+      { "from": "120 store POS systems", "to": "Store extract jobs", "description": "Nightly incremental pull of sales, returns and voids by business date." },
+      { "from": "E-commerce DB read replica", "to": "Store extract jobs", "description": "Incremental read of orders and line items from a replica, not the primary." },
+      { "from": "Marketing platform API", "to": "Managed SaaS connector", "description": "Scheduled sync of campaigns, spend and attribution." },
+      { "from": "Store extract jobs", "to": "Raw zone", "description": "Write unchanged files partitioned by source, store and date; idempotent overwrite." },
+      { "from": "Managed SaaS connector", "to": "Raw zone", "description": "Land marketing data in the raw zone." },
+      { "from": "Raw zone", "to": "Source contract checks", "description": "Validate schema, coverage and row counts for the night's partitions." },
+      { "from": "Source contract checks", "to": "dbt transforms", "description": "On pass, run incremental staging, core and mart models." },
+      { "from": "Source contract checks", "to": "Alerts", "description": "On fail, notify the owner and keep prior data published." },
+      { "from": "dbt transforms", "to": "Quality checks", "description": "Run tests, freshness and reconciliation before publishing." },
+      { "from": "Quality checks", "to": "Warehouse", "description": "On pass, promote models to the published schema." },
+      { "from": "Quality checks", "to": "Alerts", "description": "On fail, alert and block publishing." },
+      { "from": "Warehouse", "to": "BI dashboards", "description": "Dashboards query published marts." },
+      { "from": "Warehouse", "to": "Feature tables", "description": "Build weekly per-product features from published marts." },
+      { "from": "Feature tables", "to": "Weekly forecast job", "description": "Training and inference read the same feature definitions." },
+      { "from": "Weekly forecast job", "to": "Model registry", "description": "Log candidate model, metrics and promote the champion if it wins the holdout." },
+      { "from": "Weekly forecast job", "to": "Forecast table", "description": "Write next-week forecasts with model version." },
+      { "from": "Forecast table", "to": "BI dashboards", "description": "Forecast and forecast-versus-actual views." },
+      { "from": "Orchestrator", "to": "Store extract jobs", "description": "Schedules and retries extract tasks per store." },
+      { "from": "Secret manager", "to": "Store extract jobs", "description": "Supplies source credentials at run time." }
+    ],
+    "decisions": [
+      {
+        "decision": "Batch ELT with dbt in the warehouse; no Spark",
+        "rationale": "Data volume from 120 stores plus e-commerce is small to medium (millions of rows per day at most). SQL transforms are testable, readable by analysts and cheap to run.",
+        "tradeoffs": "Very complex per-row logic is harder in SQL; revisit if volume or transforms outgrow the warehouse.",
+        "alternativesRejected": ["Spark/Databricks for transforms", "ETL before landing, which loses raw data"]
+      },
+      {
+        "decision": "Land raw data unchanged in object storage before any transform",
+        "rationale": "Enables replay, backfills after bug fixes and audit without re-pulling from fragile store POS systems.",
+        "tradeoffs": "Extra storage cost and one more hop, both small.",
+        "alternativesRejected": ["Load straight into the warehouse"]
+      },
+      {
+        "decision": "Custom extract jobs for POS and e-commerce; managed connector for the marketing platform",
+        "rationale": "POS systems are internal or vendor-specific and unlikely to have a connector; the marketing platform is a standard SaaS source where buying beats building.",
+        "tradeoffs": "Custom extractors need maintenance per POS version. If all stores run the same POS product, one extractor covers all.",
+        "alternativesRejected": ["Custom code for everything", "Managed connectors for all sources"]
+      },
+      {
+        "decision": "Per-store tasks with partial-failure tolerance and a completeness gate",
+        "rationale": "With 120 stores, some will be offline on any night. Independent tasks isolate failures; a threshold gate (for example, all stores required for finance marts, 95% for dashboards with a visible 'missing stores' banner) avoids blocking everything on one store.",
+        "tradeoffs": "Dashboards may show partial data with a flag; thresholds need business agreement.",
+        "alternativesRejected": ["All-or-nothing nightly run", "Publish whatever arrived without flags"]
+      },
+      {
+        "decision": "Publish only after quality checks pass (write-audit-publish)",
+        "rationale": "Wrong numbers on dashboards erode trust faster than late numbers. Previous good data stays visible when checks fail.",
+        "tradeoffs": "Dashboards can be stale on bad nights; mitigated with a freshness indicator.",
+        "alternativesRejected": ["Publish then fix"]
+      },
+      {
+        "decision": "Idempotent partition-overwrite loads keyed on store and business date",
+        "rationale": "Retries and backfills must never duplicate sales. Overwriting a partition is simpler than dedupe merges.",
+        "tradeoffs": "Late-arriving corrections need a reload window (re-pull the last N days nightly).",
+        "alternativesRejected": ["Append-only loads with downstream dedupe only"]
+      },
+      {
+        "decision": "Feature tables in the warehouse via shared definitions; no feature store",
+        "rationale": "One weekly model family with batch inference. Shared dbt feature models prevent training/serving skew without extra infrastructure.",
+        "tradeoffs": "Add a feature store only if multiple teams or online inference appear.",
+        "alternativesRejected": ["Feast or a managed feature store"]
+      },
+      {
+        "decision": "Batch predictions written to a table; no online serving",
+        "rationale": "Forecasts are weekly and consumed by dashboards and planners, with no request-time dependence.",
+        "tradeoffs": "No on-demand what-if forecasting.",
+        "alternativesRejected": ["Model serving API"]
+      },
+      {
+        "decision": "Champion/challenger gate with baseline fallback",
+        "rationale": "Prevents a bad retrain from silently degrading forecasts; a seasonal-naive baseline guarantees an output.",
+        "tradeoffs": "Slightly more evaluation code.",
+        "alternativesRejected": ["Always deploy the latest model"]
+      },
+      {
+        "decision": "Managed orchestrator and managed warehouse, with budgets and alerts",
+        "rationale": "Small team; avoids operating Kubernetes or Airflow clusters. Budget alerts control cost.",
+        "tradeoffs": "Vendor lock-in and a minimum monthly bill; SQL and Parquet raw data keep exit cost moderate.",
+        "alternativesRejected": ["Self-hosted Airflow on Kubernetes"]
+      },
+      {
+        "decision": "Security and privacy by minimization: exclude customer PII from the pipeline",
+        "rationale": "Sales and forecast analysis does not need names or emails. Hash or drop customer identifiers at the extract step, so deletion requests rarely touch the pipeline and PCI scope is avoided (never ingest card numbers).",
+        "tradeoffs": "Customer-level analysis is not possible without a later design change.",
+        "alternativesRejected": ["Ingest full customer records and mask later"]
+      },
+      {
+        "decision": "Operations baseline: environments, deploys, backups, retention, dependency scanning",
+        "rationale": "Local (dbt with a small sample) plus dev and prod warehouse schemas; dbt and pipeline code deployed via CI with tests and rollback by git revert. Warehouse time travel and raw zone versioning serve as backups, with a tested restore. Raw data retained 2 years, logs 30-90 days with no PII. TLS everywhere, encryption at rest by default, Dependabot or equivalent scanning. Not needed: rate limits, bot protection, end-user auth in the app (no public API; dashboards use the BI tool's SSO and roles), webhooks, and LLM-specific controls (no LLM in the design).",
+        "tradeoffs": "Staging is a schema-level separation rather than a full duplicate stack, to save cost.",
+        "alternativesRejected": ["Full separate staging stack"]
+      }
+    ],
+    "risks": [
+      {
+        "risk": "POS schema or version changes at some of the 120 stores (a vendor update, a store on an old version) silently break or corrupt extracts, so sales are missing or misparsed for some stores.",
+        "category": "data",
+        "likelihood": "high",
+        "mitigation": "Contract checks on columns, types and store coverage before transform; a per-store completeness dashboard; fail loudly rather than coerce; keep a per-store POS version inventory."
+      },
+      {
+        "risk": "Nightly run misses the morning SLA because slow or offline stores, the VPN or the POS vendor delay extraction, so dashboards are stale when managers need them.",
+        "category": "reliability",
+        "likelihood": "high",
+        "mitigation": "Independent per-store tasks with timeouts and retries, a completeness threshold that allows partial publishing with a banner, late-store catch-up on the next run, and a data-ready-by-time alert at an agreed hour."
+      },
+      {
+        "risk": "Forecast quality degrades unnoticed (promotions, new products, stock-outs censoring demand), leading to wrong replenishment decisions.",
+        "category": "data",
+        "likelihood": "medium",
+        "mitigation": "Weekly forecast-versus-actual tracking per product group, a champion/challenger gate, a seasonal-naive baseline comparison, and an alert when error exceeds baseline; include stock-out flags as features."
+      },
+      {
+        "risk": "Warehouse and managed-tool costs grow faster than expected from full-table rebuilds, repeated backfills or unbounded dashboard queries.",
+        "category": "cost",
+        "likelihood": "medium",
+        "mitigation": "Incremental, date-partitioned models; warehouse budgets with alerts and query cost caps; backfill in bounded chunks; review spend monthly. Revisit warehouse choice if spend passes an agreed threshold."
+      },
+      {
+        "risk": "Dependence on a single managed warehouse/orchestrator vendor and on the POS vendor's access method; a price rise or outage blocks reporting, and a single credential compromise exposes all sales data.",
+        "category": "vendor",
+        "likelihood": "low",
+        "mitigation": "Keep raw data in open formats (Parquet) and transforms in standard SQL via dbt for portability; read-only least-privilege source credentials in a secret manager with rotation; document a restore and re-run procedure from the raw zone."
+      }
+    ],
+    "openQuestions": [
+      "Assumed all stores run the same POS product and expose either a database or an export API reachable via VPN or an agent; confirm the actual systems and versions.",
+      "Assumed data volume is under about 10 million sales rows per day, so a single managed warehouse is sufficient.",
+      "Assumed the nightly SLA is dashboards ready by 07:00 local time; confirm the required time and time zones.",
+      "Assumed a cloud provider with a managed warehouse; confirm the preferred provider and any existing contracts.",
+      "Assumed forecasts are weekly per product (SKU) at chain level, with an optional store-cluster split; confirm the required granularity and horizon.",
+      "Assumed no customer PII is needed; confirm whether loyalty or customer-level analysis is expected.",
+      "Assumed card payment data is never ingested, keeping PCI scope out; confirm POS exports exclude card numbers.",
+      "Assumed an existing company SSO is available for the BI tool.",
+      "Assumed raw data retention of 2 years and warehouse history of 3 years; confirm legal and finance requirements.",
+      "Assumed a completeness threshold of 95% of stores for dashboard publishing; confirm with the business.",
+      "Assumed a small data team (1-3 people) owns on-call and alert response; confirm ownership.",
+      "Assumed regions are covered by GDPR/CCPA only for customer data, which is excluded; confirm any other compliance obligations."
+    ]
+  }
+}
+```

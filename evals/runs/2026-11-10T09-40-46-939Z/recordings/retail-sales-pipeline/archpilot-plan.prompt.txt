@@ -1,0 +1,418 @@
+You are planning a software architecture before any code is written.
+The user is not available for an interview: assume sensible defaults for anything
+unspecified and list each assumption in architecture.openQuestions.
+
+Project: Nightly pipeline for a retail chain that pulls sales from 120 store POS systems, the e-commerce database and a marketing platform, cleans and joins them, and feeds dashboards plus a weekly demand forecast per product.
+
+Closest reference architecture (adapt it, explain deviations in decisions):
+
+# Data / ML pipeline
+
+Land raw data unchanged, transform it into tested models in a warehouse, and train and
+serve ML models from the same feature definitions.
+
+## Diagram
+
+```mermaid
+flowchart LR
+  sources[("App DB, SaaS APIs, events")] --> connectors["Connectors"]
+  connectors --> raw[("Raw zone: object storage")]
+  orchestrator["Orchestrator"] -.-> connectors
+  orchestrator -.-> transform
+  orchestrator -.-> training
+  raw --> transform["Transforms: dbt / Spark"]
+  transform --> quality{"Quality checks"}
+  quality -->|pass| warehouse[("Warehouse")]
+  quality -->|fail| alerts["Alerts"]
+  warehouse --> bi["BI dashboards"]
+  warehouse --> features[("Feature tables")]
+  features --> training["Training jobs"]
+  training --> registry[("Model registry")]
+  registry --> serving["Model serving"]
+  features --> serving
+```
+
+## Trade-offs
+
+- **ELT in the warehouse vs ETL in Spark:** ELT with dbt is simpler and testable in SQL;
+  Spark only when data or transforms outgrow the warehouse.
+- **Managed connectors vs custom:** buy connectors for SaaS sources; write custom ones only
+  for internal systems.
+- **Feature store:** heavy for one or two models; feature tables in the warehouse plus a
+  shared feature definition library are enough to start.
+- **Batch vs online serving:** batch predictions written to a table are far simpler;
+  online serving only when predictions depend on request-time data.
+
+## Failure modes and mitigations
+
+1. **Schema drift.** Contract tests on sources, and fail loudly on unexpected columns or
+   types instead of coercing.
+2. **Late or partial data.** Freshness and row-count checks per table; publish dashboards
+   only after checks pass.
+3. **Training/serving skew.** One feature definition used by both training and serving;
+   log served features and compare distributions.
+4. **Model drift.** Monitor prediction distributions and delayed ground-truth metrics;
+   retrain on a schedule with a champion/challenger gate.
+5. **Backfill cost.** Partition tables, backfill incrementally, and set warehouse budgets.
+
+## Do not use it for
+
+- Real-time decisions under 100 ms on fresh events: use a streaming design.
+- A single small database with a few reports: query a read replica directly.
+- One-off analysis: a notebook is fine; do not build a pipeline.
+
+Check every concern below. Each must be handled by a component or decision, or noted
+as not needed with a reason:
+
+# Commonly forgotten concerns
+
+For each concern, the design must either handle it (name the component or decision) or say
+explicitly why it is not needed. Use the probing question when you are unsure.
+
+## Auth and access
+
+- **Authentication**: who can log in and how (email, SSO, social, API keys)? Buy it unless
+  there is a strong reason not to.
+- **Authorization**: roles, per-object permissions, tenant isolation. Enforced in one place?
+- **Service-to-service auth**: how do internal services and jobs authenticate?
+
+## Traffic and abuse
+
+- **Rate limits**: per user, per IP, per API key; on login and expensive endpoints first.
+- **Input limits**: maximum upload size, payload size, pagination limits.
+- **Bots and abuse**: signup spam, scraping, credential stuffing.
+
+## Async work
+
+- **Queues**: anything slower than ~1 s or calling third parties goes to a background job.
+- **Idempotency**: retries happen. Payments, emails, webhooks and job handlers must be safe
+  to run twice (idempotency keys, processed-event ids).
+- **Retries and dead letters**: bounded retries with backoff; failed jobs go somewhere
+  visible.
+- **Webhooks in**: verify signatures, store events, process asynchronously.
+
+## Operations
+
+- **Observability**: structured logs, metrics (latency, error rate, saturation), traces with
+  a request id across services, and alerts that a human will act on.
+- **Health checks and deploys**: readiness checks, zero-downtime deploys, rollback plan.
+- **Backups**: automated database backups, tested restore, point-in-time recovery if data
+  is valuable. Object storage versioning for user files.
+- **Environments**: at least local and production; staging if more than one developer.
+- **Migrations**: schema changes that do not lock tables or break the running version.
+
+## Security
+
+- **Secrets**: stored in a secret manager or platform env vars, never in the repo; rotation
+  plan.
+- **Encryption**: TLS everywhere; encryption at rest for sensitive data.
+- **Dependencies**: automated updates and vulnerability scanning.
+- **LLM-specific**: prompt injection through user or retrieved content, tool permissions,
+  output validation.
+
+## Cost
+
+- **Cost per request / per user**: estimate it, especially for LLM calls, media, egress.
+- **Cost ceilings**: budgets and alerts; caps on per-user expensive operations.
+- **Idle cost**: managed services with a high minimum bill.
+
+## Failure modes
+
+- **Third-party outages**: what happens when the payment, auth, email or LLM provider is
+  down? Timeouts, fallbacks, degraded mode.
+- **Single points of failure**: one database, one region, one worker.
+- **Data consistency**: what if a step in a multi-step write fails halfway?
+
+## Data lifecycle and privacy
+
+- **Data deletion**: account deletion that also removes data from backups, search indexes,
+  analytics and third parties within the required time.
+- **Data export**: users or customers asking for their data.
+- **Retention**: how long logs, events and user content are kept.
+- **PII in logs**: mask or avoid it.
+- **Compliance**: GDPR/CCPA basics, and HIPAA/PCI/SOC 2 if the domain requires it.
+
+
+Run a pre-mortem and put the top 5 risks in architecture.risks:
+
+# Pre-mortem
+
+Imagine it is twelve months after launch and the project has failed or had a serious
+incident. Write the five most likely causes for **this** design, not generic ones. Cover at
+least one cause from each category below, then pick the five with the highest
+likelihood x impact.
+
+For each risk give: what happens (one sentence), likelihood (low/medium/high), and one
+concrete mitigation the team can actually do.
+
+## Categories and prompts
+
+### Scaling
+
+- Which component hits its limit first if usage is 10x the estimate? (Usually the database,
+  a single worker, or a synchronous third-party call.)
+- Is there a hot partition, hot tenant or hot document?
+- What happens during a traffic spike from a launch or a push notification?
+
+### Cost
+
+- Which line item grows faster than revenue? (LLM tokens, egress, per-seat SaaS, logs.)
+- Is there an operation a single user can trigger that costs real money each time?
+- What is the minimum monthly bill even with zero users?
+
+### Vendor dependency
+
+- Which vendor, if it raised prices 3x, shut down an API, or had a day-long outage, would hurt
+  the most?
+- Is data stored in a format or service that is hard to export?
+- Is there an abstraction or exit plan for that vendor (even if not built yet)?
+
+### Data-pipeline fragility
+
+- Where does data move between systems (ETL, webhooks, sync, search indexing)?
+- What happens on schema changes, partial failures, duplicates, or late data?
+- How would anyone notice the data is wrong?
+
+### Security
+
+- What is the most valuable data, and what is the shortest path for an attacker to reach it?
+- Can one tenant or user ever see another's data?
+- Are there admin tools, API keys or LLM tools with more power than they need?
+
+## Good vs weak risk entries
+
+Weak: "The system might not scale." / Mitigation: "Make it scalable."
+
+Good: "Postgres write load from the activity feed exceeds a single instance around 2k
+writes/s." / Likelihood: medium / Mitigation: "Batch feed writes through the job queue and
+add a read replica for feed reads; revisit partitioning at 1k writes/s."
+
+## Feeding back into the design
+
+- If a mitigation is cheap (an index, a queue, a rate limit), add it to the design now.
+- If it is expensive, record it as a risk with a trigger ("revisit when ...").
+- Every risk goes into `ARCHITECTURE.md` via `export_architecture_md` with its category.
+
+
+Size the design to the stated scale; avoid over-engineering.
+The Mermaid diagram must be a flowchart with one node per component. Quote labels
+that contain special characters (A["Auth (SSO)"]) and never use reserved ids like end.
+
+Respond with only one JSON object in a ```json block, matching this JSON Schema:
+
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "mermaid": {
+      "type": "string",
+      "minLength": 1
+    },
+    "architecture": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Project name"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "What the system does, for whom, and the core job-to-be-done"
+        },
+        "components": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "responsibility": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "technology": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "name",
+              "responsibility"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "dataFlow": {
+          "default": [],
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "decisions": {
+          "minItems": 1,
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "decision": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "tradeoffs": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "alternativesRejected": {
+                "default": [],
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              }
+            },
+            "required": [
+              "decision",
+              "rationale",
+              "tradeoffs",
+              "alternativesRejected"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "risks": {
+          "minItems": 1,
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "risk": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "category": {
+                "default": "other",
+                "type": "string",
+                "enum": [
+                  "scaling",
+                  "cost",
+                  "vendor",
+                  "data",
+                  "security",
+                  "reliability",
+                  "other"
+                ]
+              },
+              "likelihood": {
+                "default": "medium",
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              },
+              "mitigation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "risk",
+              "category",
+              "likelihood",
+              "mitigation"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Pre-mortem: how this design fails, with a mitigation each"
+        },
+        "diagramPath": {
+          "description": "Project-relative path of the rendered diagram",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "mermaidSource": {
+          "description": "Mermaid source of the diagram",
+          "type": "string",
+          "maxLength": 50000
+        },
+        "openQuestions": {
+          "default": [],
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "required": [
+        "title",
+        "summary",
+        "components",
+        "dataFlow",
+        "decisions",
+        "risks",
+        "openQuestions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "mermaid",
+    "architecture"
+  ],
+  "additionalProperties": false
+}

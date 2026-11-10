@@ -1,0 +1,3 @@
+Draw me an architecture diagram for this project. Use Mermaid.
+
+Project: Online appointment booking for a network of 15 physiotherapy clinics: patients pick a therapist and time slot, get SMS reminders, fill intake forms with health information, and clinics manage schedules. Patient data is sensitive and must stay in the EU.

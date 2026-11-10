@@ -1,0 +1,3 @@
+Draw me an architecture diagram for this project. Use Mermaid.
+
+Project: An AI agent for small accounting firms that reads incoming invoices from email, extracts the fields, matches them against purchase orders in the client's accounting software, flags mismatches, and drafts payment entries for a human to approve.

@@ -1,0 +1,76 @@
+```mermaid
+flowchart TB
+    subgraph Inbox["Ingestion"]
+        EMAIL[Email Inbox<br/>Gmail / Outlook API]
+        POLL[Email Poller / Webhook]
+        ATT[Attachment Extractor<br/>PDF, image, inline body]
+    end
+
+    subgraph Extraction["Extraction"]
+        OCR[OCR / Document Parser]
+        LLM[LLM Field Extractor<br/>vendor, invoice no, date,<br/>line items, tax, total]
+        VAL[Schema Validation<br/>+ Confidence Scoring]
+    end
+
+    subgraph Matching["Matching & Review"]
+        PO[PO Lookup]
+        MATCH[Matching Engine<br/>2-way / 3-way, tolerances]
+        FLAG[Mismatch Flagger<br/>price, qty, vendor, duplicate]
+    end
+
+    subgraph Accounting["Accounting Integration"]
+        ADAPT[Accounting Adapter Layer<br/>QuickBooks / Xero / etc.]
+        ACCT[(Client Accounting Software)]
+    end
+
+    subgraph Approval["Human-in-the-Loop"]
+        DRAFT[Payment Entry Drafter]
+        QUEUE[Approval Queue / Review UI]
+        HUMAN{{Accountant}}
+    end
+
+    subgraph Platform["Platform Services"]
+        ORCH[Agent Orchestrator<br/>workflow + retries]
+        DB[(App DB<br/>invoices, matches, state)]
+        STORE[(Document Storage)]
+        AUDIT[(Audit Log)]
+        TENANT[Client / Tenant Config<br/>credentials, rules, tolerances]
+        NOTIFY[Notifications<br/>email / Slack]
+    end
+
+    EMAIL --> POLL --> ATT
+    ATT --> STORE
+    ATT --> OCR --> LLM --> VAL
+    VAL -- low confidence --> QUEUE
+    VAL --> PO
+    PO <--> ADAPT
+    ADAPT <--> ACCT
+    PO --> MATCH
+    MATCH -- matched --> DRAFT
+    MATCH -- mismatch --> FLAG --> QUEUE
+    DRAFT --> QUEUE
+    QUEUE --> HUMAN
+    HUMAN -- approve --> ADAPT
+    HUMAN -- reject / correct --> ORCH
+    ADAPT -- post payment entry --> ACCT
+    QUEUE --> NOTIFY
+
+    ORCH -. coordinates .- POLL
+    ORCH -. coordinates .- LLM
+    ORCH -. coordinates .- MATCH
+    ORCH --> DB
+    TENANT -.-> MATCH
+    TENANT -.-> ADAPT
+    ORCH --> AUDIT
+    HUMAN --> AUDIT
+```
+
+**Key design points**
+
+- **Human approval gate:** the agent only drafts entries. Nothing is written to the accounting system as a payment until the accountant approves, and the adapter is the only component that writes there.
+- **Confidence routing:** low-confidence extractions go straight to review instead of matching on bad data.
+- **Adapter layer:** isolates QuickBooks, Xero, and similar differences, so the matching logic stays software-agnostic.
+- **Per-client config:** tolerances, credentials, and matching rules are stored per client, which fits a multi-client firm.
+- **Audit log:** records every agent action and human decision.
+
+I assumed a single orchestrated workflow. If you want a sequence diagram of the approval flow or a deployment view, I can add one.

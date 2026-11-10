@@ -1,7 +1,28 @@
 {
   "name": "archpilot-mcp",
-  "version": "0.0.0",
-  "description": "Plan before you code: interview, architecture, pre-mortem, and a validated diagram as a contract.",
+  "version": "0.1.0",
+  "description": "Plan before you code: an MCP server + Claude Code skill that interviews you, runs a pre-mortem, and writes a validated architecture diagram and ARCHITECTURE.md contract.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude-code",
+    "claude",
+    "skill",
+    "architecture",
+    "system-design",
+    "mermaid",
+    "diagram",
+    "planning"
+  ],
+  "homepage": "https://github.com/saimsheikh/archpilot#readme",
+  "bugs": {
+    "url": "https://github.com/saimsheikh/archpilot/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saimsheikh/archpilot.git"
+  },
+  "author": "saim sheikh",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -23,7 +44,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --exclude tests/e2e/**",
     "test:e2e": "npm run build && vitest run tests/e2e",
-    "eval:retrieval": "tsx evals/retrieval/run.ts"
+    "eval:retrieval": "tsx evals/retrieval/run.ts",
+    "eval": "tsx evals/harness/run.ts",
+    "prepack": "npm run build",
+    "verify:pack": "node scripts/verify-pack.mjs"
   },
   "dependencies": {
     "@mermaid-js/mermaid-cli": "^12.2.0",

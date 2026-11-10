@@ -1,0 +1,67 @@
+```mermaid
+flowchart LR
+    subgraph Users["Staff (60)"]
+        W[Warehouse staff]
+        S[Support staff]
+    end
+
+    subgraph Google["Google Workspace"]
+        IDP[Google OIDC login<br/>restricted to company domain]
+    end
+
+    subgraph App["Internal Tool (single deployable)"]
+        UI[Web UI<br/>order lookup, address edit,<br/>refund, audit view]
+        API[Backend API]
+        AUTH[Auth middleware<br/>session + role from Google group]
+        subgraph Domain["Domain services"]
+            ORD[Order service<br/>search, view]
+            ADDR[Address service<br/>validate + update]
+            REF[Refund service<br/>enforces role-based limit]
+            AUD[Audit service<br/>who, what, before/after, when]
+        end
+    end
+
+    subgraph Data["Data"]
+        DB[(App DB<br/>orders, refunds)]
+        ALOG[(Audit log<br/>append-only table)]
+    end
+
+    PAY[Payment provider API<br/>refunds]
+    FUL[Shipping / fulfilment system<br/>address sync]
+
+    W --> UI
+    S --> UI
+    UI -->|login redirect| IDP
+    IDP -->|ID token| AUTH
+    UI --> API
+    API --> AUTH
+    AUTH --> ORD
+    AUTH --> ADDR
+    AUTH --> REF
+
+    ORD --> DB
+    ADDR --> DB
+    ADDR --> FUL
+    REF --> DB
+    REF --> PAY
+
+    ADDR -.->|every change| AUD
+    REF -.->|every change| AUD
+    AUD --> ALOG
+    API -->|read trail| AUD
+```
+
+**Key decisions the diagram encodes**
+
+- **Login:** Google OIDC, restricted to your Workspace domain. Roles (e.g. `support`, `support-lead`, `warehouse`) come from Google Groups, so access is managed where you already manage people.
+- **Refund limit:** enforced server-side in the Refund service, with the limit tied to role. The UI only hides the button; it is not the control.
+- **Audit trail:** the write and its audit record are committed in the same DB transaction, so a change can't exist without a record. The audit table is append-only (no update or delete permissions for the app's DB user).
+- **Size:** at 60 users, a single deployable (modular monolith) with one database is enough. No queues or microservices needed.
+
+**Assumptions to confirm**
+
+- Orders already live in another system (e-commerce platform or ERP). If so, "App DB" becomes a cache plus local refund/audit data, and that system is the source of truth for address changes.
+- Refunds go through an existing payment provider.
+- Warehouse staff may only need lookup and address changes, not refunds.
+
+If any of those are wrong, I can adjust the diagram.

@@ -1,0 +1,464 @@
+{
+  "runId": "2026-11-10T09-40-46-939Z",
+  "model": "sonnet",
+  "summaries": [
+    {
+      "condition": "archpilot",
+      "ideas": 10,
+      "failures": 0,
+      "firstPassRenderRate": 1,
+      "finalRenderRate": 1,
+      "averageRepairAttempts": 0,
+      "averageRenderMs": 2471,
+      "averageRubric": 5.9,
+      "criterionRates": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 0.9,
+        "security": 1
+      }
+    },
+    {
+      "condition": "baseline",
+      "ideas": 10,
+      "failures": 0,
+      "firstPassRenderRate": 1,
+      "finalRenderRate": 1,
+      "averageRepairAttempts": 0,
+      "averageRenderMs": 2851,
+      "averageRubric": 3.5,
+      "criterionRates": {
+        "auth": 0.8,
+        "dataStore": 0.8,
+        "failureHandling": 0.5,
+        "observability": 0.6,
+        "cost": 0.1,
+        "security": 0.7
+      }
+    }
+  ],
+  "results": [
+    {
+      "ideaId": "team-okr-saas",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 4853
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "team-okr-saas",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 3653
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 0,
+        "observability": 1,
+        "cost": 0,
+        "security": 1
+      },
+      "rubricTotal": 4
+    },
+    {
+      "ideaId": "support-rag-bot",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 1826
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "support-rag-bot",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 4367
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 0,
+        "failureHandling": 0,
+        "observability": 1,
+        "cost": 0,
+        "security": 0
+      },
+      "rubricTotal": 2
+    },
+    {
+      "ideaId": "habit-mobile-app",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 4511
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "habit-mobile-app",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 3468
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "tutor-marketplace",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 2314
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "tutor-marketplace",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 2577
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 0,
+        "cost": 0,
+        "security": 0
+      },
+      "rubricTotal": 3
+    },
+    {
+      "ideaId": "retail-sales-pipeline",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 2753
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "retail-sales-pipeline",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 2561
+      },
+      "rubric": {
+        "auth": 0,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 0,
+        "security": 0
+      },
+      "rubricTotal": 3
+    },
+    {
+      "ideaId": "invoice-agent",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 1935
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "invoice-agent",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 2228
+      },
+      "rubric": {
+        "auth": 0,
+        "dataStore": 0,
+        "failureHandling": 1,
+        "observability": 0,
+        "cost": 0,
+        "security": 1
+      },
+      "rubricTotal": 2
+    },
+    {
+      "ideaId": "warehouse-admin-tool",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 1564
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 0,
+        "security": 1
+      },
+      "rubricTotal": 5
+    },
+    {
+      "ideaId": "warehouse-admin-tool",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 3759
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 0,
+        "observability": 0,
+        "cost": 0,
+        "security": 1
+      },
+      "rubricTotal": 3
+    },
+    {
+      "ideaId": "live-quiz-app",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 1561
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "live-quiz-app",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 2387
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 0,
+        "observability": 0,
+        "cost": 0,
+        "security": 1
+      },
+      "rubricTotal": 3
+    },
+    {
+      "ideaId": "clinic-booking",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 1604
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "clinic-booking",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 1766
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 0,
+        "security": 1
+      },
+      "rubricTotal": 5
+    },
+    {
+      "ideaId": "iot-fleet-monitoring",
+      "condition": "archpilot",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 1784
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 1,
+        "observability": 1,
+        "cost": 1,
+        "security": 1
+      },
+      "rubricTotal": 6
+    },
+    {
+      "ideaId": "iot-fleet-monitoring",
+      "condition": "baseline",
+      "diagram": {
+        "firstPassOk": true,
+        "finalOk": true,
+        "repairAttempts": 0,
+        "simplified": false,
+        "errorCodes": [],
+        "renderMs": 1748
+      },
+      "rubric": {
+        "auth": 1,
+        "dataStore": 1,
+        "failureHandling": 0,
+        "observability": 1,
+        "cost": 0,
+        "security": 1
+      },
+      "rubricTotal": 4
+    }
+  ]
+}

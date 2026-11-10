@@ -1,0 +1,3 @@
+Draw me an architecture diagram for this project. Use Mermaid.
+
+Project: An iOS and Android habit tracker with streaks, reminders via push notifications, optional sync across devices, and a premium subscription through the app stores. Target 200k monthly active users.

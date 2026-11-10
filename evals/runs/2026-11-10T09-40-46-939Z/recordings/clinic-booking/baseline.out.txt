@@ -1,0 +1,86 @@
+```mermaid
+flowchart TB
+    subgraph Clients["Clients"]
+        Patient["Patient<br/>(Web / Mobile PWA)"]
+        Staff["Clinic Staff & Therapists<br/>(Admin Web App)"]
+    end
+
+    subgraph EU["EU Region only (e.g. Frankfurt / Dublin), all data at rest and in transit stays here"]
+        Edge["CDN + WAF<br/>(EU edge only)"]
+        Gateway["API Gateway<br/>(rate limiting, TLS, authN checks)"]
+
+        subgraph Identity["Identity"]
+            Auth["Auth Service<br/>(OIDC, MFA for staff)"]
+        end
+
+        subgraph Core["Core Services"]
+            Booking["Booking Service<br/>(pick therapist, reserve slot)"]
+            Schedule["Scheduling Service<br/>(availability, clinic calendars)"]
+            Clinic["Clinic and Therapist Service<br/>(15 clinics, staff, rooms)"]
+            Intake["Intake Forms Service<br/>(health information)"]
+            Notify["Notification Service<br/>(reminder scheduler)"]
+        end
+
+        Queue[["Message Queue / Event Bus"]]
+
+        subgraph Data["Data Stores (encrypted at rest, KMS keys in EU)"]
+            BookingDB[("Booking and Schedule DB<br/>PostgreSQL")]
+            ClinicDB[("Clinic and User DB<br/>PostgreSQL")]
+            PHIDB[("PHI Store<br/>Intake answers<br/>field-level encryption")]
+            Audit[("Audit Log<br/>append-only")]
+            Cache[("Redis Cache<br/>slot availability")]
+        end
+
+        KMS["KMS / Secrets Manager<br/>(EU keys)"]
+        Obs["Logging and Monitoring<br/>(EU-hosted, PHI scrubbed)"]
+    end
+
+    subgraph External["External Providers (EU-based, DPA signed)"]
+        SMS["SMS Gateway<br/>(EU provider)"]
+        Email["Email Service<br/>(optional, EU)"]
+    end
+
+    Patient --> Edge
+    Staff --> Edge
+    Edge --> Gateway
+    Gateway --> Auth
+    Gateway --> Booking
+    Gateway --> Schedule
+    Gateway --> Clinic
+    Gateway --> Intake
+
+    Booking --> Schedule
+    Booking --> Cache
+    Booking --> BookingDB
+    Schedule --> BookingDB
+    Schedule --> Cache
+    Clinic --> ClinicDB
+    Auth --> ClinicDB
+    Intake --> PHIDB
+    Intake -. "decrypt keys" .-> KMS
+    PHIDB -. "encrypted with" .-> KMS
+
+    Booking -- "BookingConfirmed / Cancelled" --> Queue
+    Queue --> Notify
+    Notify --> BookingDB
+    Notify -- "time and clinic only,<br/>no health data" --> SMS
+    Notify --> Email
+
+    Intake --> Audit
+    Booking --> Audit
+    Staff -. "PHI access logged" .-> Audit
+
+    Core --> Obs
+    Gateway --> Obs
+```
+
+**Key design decisions**
+
+- **EU residency:** Every component, backup, key and log lives in an EU region. The CDN/WAF is restricted to EU edge locations, and the SMS and email vendors are EU-based with data processing agreements.
+- **PHI isolation:** Intake answers are kept in a separate store, with field-level encryption and keys in an EU KMS. Booking data (who, when, where) is kept apart from health data, so a breach of one does not expose the other.
+- **SMS carries no health data:** Reminders contain only the time, clinic and a link. Sensitive details stay behind login.
+- **Event-driven reminders:** Booking events go through a queue, so the notification service can schedule and retry SMS sends without slowing down booking.
+- **Audit trail:** Reads and writes of intake data are logged to an append-only audit store, which supports GDPR accountability. Application logs are scrubbed of PHI.
+- **Slot consistency:** The booking service reserves slots through the scheduling service with DB-level locking or unique constraints. Redis only speeds up availability reads, and the database remains the source of truth.
+
+I can split this into a deployment view, a booking-flow sequence diagram, or a data-flow diagram that marks the GDPR boundaries.

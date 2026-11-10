@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an improvement. v1 is greenfield planning only; see the roadmap in the README.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the planning situation where archpilot fell short.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This is about planning before code, not a generic diagram feature.
+          required: true

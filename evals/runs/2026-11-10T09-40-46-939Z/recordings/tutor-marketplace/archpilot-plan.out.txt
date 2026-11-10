@@ -1,0 +1,291 @@
+```json
+{
+  "mermaid": "flowchart LR\n  student([Student]) --> web[\"Web app (Next.js)\"]\n  tutor([Tutor]) --> web\n  admin([Admin]) --> web\n  web --> api[\"API (modular monolith)\"]\n  api --> auth[\"Auth provider\"]\n  api --> db[(\"Postgres + search index\")]\n  api --> cache[(\"Redis: cache, rate limits, queue\")]\n  api --> storage[(\"Object storage\")]\n  api --> payments[\"Payments provider (Connect)\"]\n  api --> video[\"Video provider\"]\n  cache --> worker[\"Background worker\"]\n  worker --> db\n  worker --> payments\n  worker --> email[\"Email/SMS provider\"]\n  worker --> video\n  payments -- webhooks --> hooks[\"Webhook receiver\"]\n  video -- webhooks --> hooks\n  hooks --> db\n  hooks --> cache\n  api --> obs[\"Logs, metrics, traces, alerts\"]\n  worker --> obs\n  db --> backups[(\"Automated backups + PITR\")]\n  api --> cdn[\"CDN + WAF\"]",
+  "architecture": {
+    "title": "Tutor Marketplace",
+    "summary": "A two-sided marketplace where students search tutors by subject and price, book and pay for sessions, attend video lessons through a third-party provider, and leave reviews. Tutors are paid out after each completed session minus a platform commission. Sized for an early-stage launch (low thousands of users, tens of bookings per minute at peak), so it is a modular monolith on managed services. The RAG reference architecture was adapted only partly: the 'hybrid retrieval over a single datastore' idea becomes Postgres full-text search plus structured filters, with no LLM, embeddings or reranker in v1.",
+    "components": [
+      {
+        "name": "Web app",
+        "responsibility": "Responsive UI for students, tutors and admins: search, tutor profiles, booking, checkout, lesson room embed, reviews, tutor dashboard and payout status.",
+        "technology": "Next.js (React, TypeScript)"
+      },
+      {
+        "name": "CDN + WAF",
+        "responsibility": "TLS termination, caching of static assets and public tutor pages, basic bot and DDoS filtering, edge rate limiting on login and signup.",
+        "technology": "Cloudflare or platform-provided CDN/WAF"
+      },
+      {
+        "name": "API (modular monolith)",
+        "responsibility": "Single deployable with modules: users/profiles, search, availability and booking, payments orchestration, lessons, reviews, payouts, admin. Enforces authorization in one policy layer, input limits and pagination caps.",
+        "technology": "Node.js/TypeScript (NestJS or Fastify) on a managed container platform"
+      },
+      {
+        "name": "Auth provider",
+        "responsibility": "Email/password, Google social login, MFA, password reset, session/JWT issuance. Roles (student, tutor, admin) are stored in our DB and checked by the API.",
+        "technology": "Managed auth (Auth0, Clerk or Cognito)"
+      },
+      {
+        "name": "Primary database",
+        "responsibility": "Source of truth for users, tutor profiles, availability, bookings, payments ledger, reviews, payouts, processed webhook events and audit log. Also hosts full-text and filter search via tsvector and indexes.",
+        "technology": "Managed PostgreSQL with PITR and one read replica later"
+      },
+      {
+        "name": "Redis",
+        "responsibility": "Job queue, rate-limit counters, short-lived booking slot holds, hot search/profile cache.",
+        "technology": "Managed Redis (BullMQ for jobs)"
+      },
+      {
+        "name": "Background worker",
+        "responsibility": "Runs slow or third-party work: payment capture/refund, transfers to tutors, emails/reminders, video room creation, review prompts, data export and deletion jobs. Bounded retries with backoff and a visible dead-letter queue.",
+        "technology": "Node.js worker process, same codebase as API"
+      },
+      {
+        "name": "Webhook receiver",
+        "responsibility": "Verifies signatures on payment and video provider webhooks, stores the raw event with its provider event id (dedupe), returns 200 fast, and enqueues processing.",
+        "technology": "Route in the API, separate rate limit and path"
+      },
+      {
+        "name": "Payments provider",
+        "responsibility": "Card collection (PCI scope stays with the provider), escrow-like hold, tutor onboarding/KYC, commission split and payouts, refunds, tax forms where supported.",
+        "technology": "Stripe Connect (separate charges and transfers)"
+      },
+      {
+        "name": "Video provider",
+        "responsibility": "Hosts lessons: room creation, short-lived join tokens per participant, attendance/duration events. Recording off by default.",
+        "technology": "Daily, Twilio Video alternative, or Zoom SDK behind an adapter"
+      },
+      {
+        "name": "Email/SMS provider",
+        "responsibility": "Booking confirmations, reminders, receipts, payout notices.",
+        "technology": "Postmark or SES (SMS via Twilio only if needed)"
+      },
+      {
+        "name": "Object storage",
+        "responsibility": "Tutor avatars, credential documents and exports, with versioning, private by default and signed URLs.",
+        "technology": "S3-compatible bucket"
+      },
+      {
+        "name": "Observability",
+        "responsibility": "Structured JSON logs with request id and PII masking, metrics (latency, error rate, queue depth, webhook lag), traces, error tracking, and alerts on payment failures, DLQ growth and payout mismatches.",
+        "technology": "Managed stack (Sentry + Grafana Cloud or Datadog)"
+      },
+      {
+        "name": "Backups",
+        "responsibility": "Daily snapshots plus point-in-time recovery for Postgres, bucket versioning, quarterly tested restore.",
+        "technology": "Managed DB backups"
+      }
+    ],
+    "dataFlow": [
+      {
+        "from": "Student",
+        "to": "Web app",
+        "description": "Searches by subject, price, rating and availability; views tutor profiles."
+      },
+      {
+        "from": "API (modular monolith)",
+        "to": "Primary database",
+        "description": "Search query uses full-text plus filters; booking creates a pending row inside a transaction with a unique constraint on tutor and time slot."
+      },
+      {
+        "from": "API (modular monolith)",
+        "to": "Payments provider",
+        "description": "Creates a PaymentIntent with an idempotency key tied to the booking id; student confirms in the browser."
+      },
+      {
+        "from": "Payments provider",
+        "to": "Webhook receiver",
+        "description": "payment_succeeded/failed events are signature-verified, stored by event id, and enqueued."
+      },
+      {
+        "from": "Background worker",
+        "to": "Primary database",
+        "description": "Marks booking confirmed, writes ledger entries (gross, commission, tutor share), schedules reminders."
+      },
+      {
+        "from": "Background worker",
+        "to": "Video provider",
+        "description": "Creates the room shortly before the session; API issues per-user join tokens to the booked student and tutor only."
+      },
+      {
+        "from": "Video provider",
+        "to": "Webhook receiver",
+        "description": "Meeting started/ended events with durations update lesson status."
+      },
+      {
+        "from": "Background worker",
+        "to": "Payments provider",
+        "description": "After lesson completion and a dispute window (e.g. 24h), creates a transfer to the tutor's connected account minus commission, idempotently."
+      },
+      {
+        "from": "Background worker",
+        "to": "Email/SMS provider",
+        "description": "Sends confirmations, reminders, review prompts and payout notices with dedupe keys."
+      },
+      {
+        "from": "Student",
+        "to": "API (modular monolith)",
+        "description": "Posts a review, allowed only for a completed booking owned by that student, one per booking."
+      },
+      {
+        "from": "Primary database",
+        "to": "Backups",
+        "description": "Continuous WAL archiving and daily snapshots."
+      },
+      {
+        "from": "API (modular monolith)",
+        "to": "Observability",
+        "description": "Logs, metrics and traces carrying a request id, also propagated to worker jobs."
+      }
+    ],
+    "decisions": [
+      {
+        "decision": "Modular monolith with a separate worker process, not microservices",
+        "rationale": "Scale is small and one team; one codebase, one database and transactional booking logic are simpler and cheaper. Module boundaries keep later extraction possible.",
+        "tradeoffs": "Deploys are coupled and a bad module can affect everything; mitigated by feature flags and fast rollback.",
+        "alternativesRejected": [
+          "Microservices per domain",
+          "Serverless functions per endpoint"
+        ]
+      },
+      {
+        "decision": "Postgres full-text search plus filters instead of a vector DB or search cluster; no LLM/RAG in v1",
+        "rationale": "Search is structured (subject, price, rating, availability) with short profile text. Postgres handles it at this scale and avoids a second source of truth. This deviates from the RAG reference, whose embeddings, reranker and LLM add cost and failure modes with no v1 need.",
+        "tradeoffs": "Weaker fuzzy/semantic matching and ranking; revisit with Elasticsearch/Typesense or pgvector if search quality metrics show misses or catalog exceeds a few hundred thousand tutors.",
+        "alternativesRejected": [
+          "Elasticsearch/OpenSearch from day one",
+          "pgvector semantic search",
+          "LLM tutor matching"
+        ]
+      },
+      {
+        "decision": "Stripe Connect with separate charges and transfers; platform holds funds until lesson completion",
+        "rationale": "Offloads PCI, tutor KYC, payouts and tax reporting, and allows commission, refunds and a dispute window before transfer.",
+        "tradeoffs": "Vendor lock-in and fees; holding funds has regulatory and country-coverage limits.",
+        "alternativesRejected": [
+          "Direct charges to tutors (no hold or refunds control)",
+          "Building payouts via bank transfers ourselves",
+          "PayPal Payouts only"
+        ]
+      },
+      {
+        "decision": "Buy auth; roles and per-object authorization live in our API policy layer",
+        "rationale": "Auth is a solved problem; ownership checks (own bookings, own payouts) must be in one place to avoid IDOR bugs.",
+        "tradeoffs": "Per-user cost and some lock-in; mitigated by keeping user ids and roles in our DB.",
+        "alternativesRejected": [
+          "Self-built password auth",
+          "Provider-only roles with no in-app policy layer"
+        ]
+      },
+      {
+        "decision": "Video behind a thin adapter interface, buying a hosted SDK",
+        "rationale": "WebRTC infrastructure is costly to run; an adapter lets us swap providers if prices or reliability change.",
+        "tradeoffs": "Lowest-common-denominator features and per-minute cost.",
+        "alternativesRejected": [
+          "Self-hosted WebRTC (LiveKit/Jitsi) in v1",
+          "Sending users to external Zoom links"
+        ]
+      },
+      {
+        "decision": "Ledger table in our DB as the record of money, reconciled daily with the payments provider",
+        "rationale": "Commission, refunds and payouts need an auditable trail independent of provider dashboards, and reconciliation detects drift.",
+        "tradeoffs": "Extra code and a nightly job.",
+        "alternativesRejected": [
+          "Relying only on provider data",
+          "Storing mutable balance columns"
+        ]
+      },
+      {
+        "decision": "Booking uses a short slot hold and a DB unique constraint to prevent double-booking",
+        "rationale": "Two students can race for one slot; the constraint is the final arbiter, with Redis hold giving a good UX during checkout.",
+        "tradeoffs": "Expired holds need cleanup; abandoned checkouts briefly block slots (10-15 min TTL).",
+        "alternativesRejected": [
+          "Optimistic UI with no hold",
+          "Distributed locks only"
+        ]
+      },
+      {
+        "decision": "All third-party calls and slow work go through the queue; webhooks are stored then processed asynchronously with event-id dedupe",
+        "rationale": "Meets idempotency, retry and outage requirements; provider downtime degrades to delayed processing instead of failed requests.",
+        "tradeoffs": "Eventual consistency; the UI must show pending states.",
+        "alternativesRejected": [
+          "Synchronous provider calls in request handlers",
+          "Processing webhooks inline"
+        ]
+      },
+      {
+        "decision": "Single region, managed Postgres with PITR, one environment each for local, staging and production",
+        "rationale": "Right-sized availability for launch; multi-region would double cost and complexity.",
+        "tradeoffs": "Regional outage means downtime; recovery relies on restore. Accepted for v1.",
+        "alternativesRejected": [
+          "Multi-region active-active",
+          "Self-managed Postgres"
+        ]
+      },
+      {
+        "decision": "Privacy by design: PII masked in logs, deletion and export jobs, retention schedule, provider data-processing agreements",
+        "rationale": "Users may include minors and are in several jurisdictions; GDPR/CCPA requests must be met within about 30 days. Financial records are retained as legally required and anonymized otherwise.",
+        "tradeoffs": "Deletion is partly anonymization; backups age out after 35 days rather than being rewritten.",
+        "alternativesRejected": [
+          "Manual deletion handled by support",
+          "Keeping all data indefinitely"
+        ]
+      },
+      {
+        "decision": "Security baseline: secrets in platform secret manager, TLS, encryption at rest, Dependabot plus vulnerability scanning, upload type/size limits, rate limits on login, search, booking and webhooks",
+        "rationale": "Cheap controls cover the common abuse paths: credential stuffing, scraping and spam signups.",
+        "tradeoffs": "Some friction for legitimate heavy users; CAPTCHA on signup only when abuse is detected.",
+        "alternativesRejected": [
+          "Defer abuse controls until after launch"
+        ]
+      }
+    ],
+    "risks": [
+      {
+        "risk": "Money drift: duplicate or missed webhooks, partial failures between payment capture, booking confirmation and tutor transfer leave students charged without a booking, or tutors unpaid or overpaid.",
+        "category": "data",
+        "likelihood": "high",
+        "mitigation": "Idempotency keys on every provider call, processed-event table, state machine for bookings, daily reconciliation job against provider with alerts on any mismatch, and a runbook for manual correction."
+      },
+      {
+        "risk": "Payments provider (Stripe Connect) account is restricted or held, or tutor KYC and country coverage block payouts, freezing revenue and tutor funds.",
+        "category": "vendor",
+        "likelihood": "medium",
+        "mitigation": "Keep an internal ledger and clean provider integration behind a payments interface, comply with provider terms on fund holding, maintain a relationship contact, and revisit a second provider when monthly volume passes an agreed threshold."
+      },
+      {
+        "risk": "Off-platform leakage: tutors and students move bookings outside the platform after first contact, so commission revenue collapses.",
+        "category": "other",
+        "likelihood": "high",
+        "mitigation": "No direct contact details or free-form messaging before payment, in-app messaging scanned for contact details, rebooking incentives and tutor tooling (recurring packages), and a metric on repeat-booking rate to detect leakage."
+      },
+      {
+        "risk": "Video minutes and fees grow faster than commission revenue (long or no-show sessions, free trial lessons), making unit economics negative.",
+        "category": "cost",
+        "likelihood": "medium",
+        "mitigation": "Cap session length and auto-end rooms, create rooms only for paid bookings, track video cost per booking against commission, set provider budget alerts, and adjust commission or minimum prices when margin falls below target."
+      },
+      {
+        "risk": "Authorization bug (IDOR) lets a user read or modify another user's bookings, payout details, tutor credential documents or join another lesson room.",
+        "category": "security",
+        "likelihood": "medium",
+        "mitigation": "Central policy layer with tests per resource, private bucket with short-lived signed URLs, per-booking video join tokens, no card data stored, and an external pentest before public launch."
+      }
+    ],
+    "openQuestions": [
+      "Assumed launch scale: up to about 5,000 tutors, 50,000 students and 100 concurrent lessons; revisit if far higher.",
+      "Assumed a single launch currency and country with Stripe Connect support; multi-currency and cross-border payouts are out of scope for v1.",
+      "Assumed commission is a flat percentage (15%) set by config, with no tiered rates or promotions.",
+      "Assumed funds release 24h after lesson completion unless a dispute is opened; refund and cancellation policy needs business confirmation.",
+      "Assumed tutors are vetted by manual admin approval, with identity checks done via the payments provider KYC.",
+      "Assumed lessons are one-to-one, with recording off by default and no in-platform chat beyond booking messages.",
+      "Assumed users may be minors under 18 only through a parent account; legal review of age and consent rules (COPPA/GDPR-K) is needed.",
+      "Assumed web only (responsive); native mobile apps are deferred.",
+      "Assumed English-only UI and tutor-set timezone-aware availability calendars with no external calendar sync in v1.",
+      "Assumed retention: application logs 30 days, backups 35 days, financial records 7 years, deleted accounts anonymized within 30 days.",
+      "Assumed no LLM features in v1; AI-based matching or lesson summaries would need a separate design with prompt-injection and cost controls.",
+      "Assumed tutor payouts are on a rolling schedule rather than on demand; needs confirmation."
+    ]
+  }
+}
+```

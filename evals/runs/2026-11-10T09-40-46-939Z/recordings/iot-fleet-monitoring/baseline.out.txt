@@ -1,0 +1,70 @@
+```mermaid
+flowchart LR
+    subgraph Vehicles["Vehicles"]
+        Van["5,000 vans<br/>GPS + engine telemetry<br/>every 10s"]
+    end
+
+    subgraph Ingest["Ingestion"]
+        MQTT["MQTT broker<br/>(TLS, per-van auth)"]
+        Stream["Event stream<br/>(Kafka / Kinesis)"]
+    end
+
+    subgraph Process["Stream processing"]
+        Norm["Telemetry processor<br/>validate + normalize"]
+        Alert["Alert engine<br/>engine faults,<br/>route deviation"]
+    end
+
+    subgraph Data["Data stores"]
+        Redis[("Redis<br/>last known position")]
+        TS[("TimescaleDB / PostGIS<br/>telemetry history")]
+        PG[("Postgres<br/>vans, routes, alert rules, users")]
+        WH[("Reports store<br/>aggregates")]
+    end
+
+    subgraph Serve["Serving"]
+        API["REST API"]
+        WS["WebSocket gateway<br/>live updates"]
+        Notify["Notification service<br/>push / SMS / email"]
+    end
+
+    subgraph Batch["Reporting"]
+        Sched["Weekly scheduler"]
+        Report["Utilization report job"]
+    end
+
+    subgraph Users["Users"]
+        Disp["Dispatcher<br/>live map + alerts"]
+        Mgr["Manager<br/>weekly reports"]
+    end
+
+    Van -->|"~500 msg/s"| MQTT --> Stream
+    Stream --> Norm
+    Norm --> Redis
+    Norm --> TS
+    Norm --> Alert
+    PG -->|"rules, planned routes"| Alert
+    Alert -->|"alert events"| Notify
+    Alert --> PG
+    Redis --> WS
+    Alert --> WS
+    WS --> Disp
+    Notify --> Disp
+    Disp --> API
+    API --> PG
+    API --> Redis
+    Sched --> Report
+    TS --> Report
+    PG --> Report
+    Report --> WH
+    Report -->|"PDF / email"| Mgr
+    Mgr --> API
+    API --> WH
+```
+
+**Design notes**
+- **Load is modest.** 5,000 vans every 10s is about 500 messages/sec, so one broker plus a small stream cluster is plenty. The stream mainly decouples ingestion from processing and lets you replay data.
+- **Live map reads from Redis.** It holds only each van's latest position, so the map never queries the history store.
+- **Alerts run in the stream path.** The alert engine evaluates each event as it arrives, comparing against planned routes and fault codes, so alerts are not delayed by batch jobs.
+- **Reports run as a weekly batch.** They aggregate from TimescaleDB, which keeps heavy queries off the live path.
+
+I can save this to a `.mmd` file or adjust it, for example a managed-cloud variant (AWS IoT Core, Kinesis, Timestream) or a deployment view.

@@ -4,8 +4,8 @@ Plan before you code. archpilot is a Claude Code Skill plus an MCP server that i
 about your idea, proposes an architecture with trade-offs and a pre-mortem, and outputs a
 validated diagram plus an `ARCHITECTURE.md` your coding agent follows as a contract.
 
-**Status: work in progress.** The MCP server (renderer, tools, pattern library) works; the
-Skill, evals and packaging are next.
+**Status: work in progress.** The MCP server, the Skill and the eval harness work;
+packaging is next.
 
 ## Requirements
 
@@ -58,6 +58,33 @@ claude mcp add archpilot -- node /absolute/path/to/repo/dist/index.js
 
 Add `--scope user` to make it available in every project. Check with `claude mcp list`.
 Claude Code starts the server in your project directory; all files are written there.
+
+## The Skill
+
+[skills/archpilot/SKILL.md](skills/archpilot/SKILL.md) is the planner. It triggers when you
+ask Claude to plan or architect a project before coding, and then:
+
+1. Interviews you in short rounds (at most 3 to 4 questions, each with a default).
+2. Picks the closest reference architecture via `list_patterns` / `get_pattern` and explains
+   deviations.
+3. Drafts components, data flow and key decisions with rejected alternatives, checked
+   against a list of commonly forgotten concerns.
+4. Runs a pre-mortem: top 5 ways the design fails, each with a mitigation.
+5. Validates the Mermaid diagram, repairing from structured errors up to 3 times, then
+   simplifying if needed.
+6. Renders the diagram and exports `ARCHITECTURE.md`.
+7. Ends with a summary and the exact first build step.
+
+Long checklists live in [skills/archpilot/references/](skills/archpilot/references/).
+
+Install it for Claude Code by copying the folder into your skills directory:
+
+```bash
+# all projects
+cp -r skills/archpilot ~/.claude/skills/
+# or one project
+mkdir -p .claude/skills && cp -r /path/to/archpilot/skills/archpilot .claude/skills/
+```
 
 ## MCP tools
 
@@ -115,6 +142,43 @@ Retrieval sits behind a `PatternRetriever` interface with two implementations, c
 
 The set is small and written by the same author as the patterns, so treat it as a
 regression check, not a benchmark.
+
+## Evals
+
+`npm run eval` runs 10 project ideas ([evals/ideas.json](evals/ideas.json)) through two
+conditions using Claude via the Claude Code CLI (headless, no settings, plugins, tools or MCP):
+
+- **baseline**: one plain prompt, "Draw me an architecture diagram for this project. Use
+  Mermaid", rendered once with no repair.
+- **archpilot**: the skill's flow run non-interactively: pattern retrieval, the forgotten-concerns
+  checklist, a pre-mortem, structured output, validation with up to 3 repairs, then simplify,
+  then render and export `ARCHITECTURE.md`.
+
+Every prompt and output is recorded under `evals/runs/<run>/recordings`, so a run can be
+re-scored without calling the model: `npm run eval -- --replay evals/runs/<run>/recordings`.
+Options: `--model`, `--only <idea-id>`, `--limit <n>`, `--concurrency <n>`.
+
+Latest run (Claude Sonnet, 10 ideas, one run each), full table in
+[evals/results/results.md](evals/results/results.md):
+
+| Metric                                                                               | archpilot | baseline |
+| ------------------------------------------------------------------------------------ | --------- | -------- |
+| First-pass render success                                                            | 100%      | 100%     |
+| Render success after repair loop                                                     | 100%      | 100%     |
+| Avg repair attempts                                                                  | 0         | 0        |
+| Avg rubric score (auth, data store, failure handling, observability, cost, security) | 5.9 / 6   | 3.5 / 6  |
+| Mentions cost                                                                        | 90%       | 10%      |
+| Mentions failure handling                                                            | 100%      | 50%      |
+
+What this does and does not show:
+
+- Sonnet produced valid Mermaid on the first try in every case, in both conditions. The repair
+  loop was never exercised in this run, so these numbers say nothing about its value; it is
+  covered by unit tests only.
+- The rubric is keyword evidence that a concern is mentioned, not a judgment of design
+  quality. The archpilot prompt includes a checklist naming these concerns, so part of the gap
+  is the method asking for them.
+- 10 ideas, one run each: expect run-to-run variance.
 
 ## License
 

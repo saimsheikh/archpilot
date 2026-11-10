@@ -1,0 +1,260 @@
+```json
+{
+  "mermaid": "flowchart TD\n  email[(\"Firm invoice mailbox\")] --> ingest[\"Email Ingestor\"]\n  ingest --> store[(\"Document Store\")]\n  ingest --> queue[\"Job Queue\"]\n  queue --> orch[\"Invoice Workflow Orchestrator\"]\n  orch --> extract[\"Extraction Step (LLM)\"]\n  extract --> llm[\"LLM API\"]\n  orch --> validate[\"Deterministic Validator\"]\n  orch --> tools[\"Accounting Tool Layer\"]\n  tools --> acct[\"Accounting Software API\"]\n  orch --> match[\"PO Matcher\"]\n  match --> tools\n  orch --> state[(\"Run State + Audit DB\")]\n  orch --> budget[\"Budget + Rate Limiter\"]\n  orch --> approvals[\"Approval Queue\"]\n  approvals --> ui[\"Reviewer Web UI\"]\n  ui --> auth[\"Auth + Tenant Authorization\"]\n  ui --> approvals\n  approvals --> poster[\"Draft Entry Poster\"]\n  poster --> tools\n  orch --> traces[(\"Traces + Evals\")]\n  secrets[\"Secret Manager\"] --> tools\n  secrets --> ingest",
+  "architecture": {
+    "title": "Invoice Matching Agent for Small Accounting Firms",
+    "summary": "A multi-tenant service for small accounting firms. It watches each client's invoice mailbox, extracts invoice fields with an LLM, matches them against purchase orders in the client's accounting software, flags mismatches (amount, vendor, quantity, duplicates), and creates DRAFT payment entries. A human reviewer must approve before anything is finalized. The job to be done is to remove manual data entry and PO checking while keeping a human in control of every financial posting.",
+    "components": [
+      {
+        "name": "Email Ingestor",
+        "responsibility": "Receives invoice emails via the mail provider's push/webhook or polling (Gmail/Microsoft 365 API), verifies signatures, dedupes by message-id, enforces attachment size/type limits, stores raw files, and enqueues a job.",
+        "technology": "TypeScript worker; Gmail API / Microsoft Graph with OAuth"
+      },
+      {
+        "name": "Document Store",
+        "responsibility": "Stores original emails and attachments, encrypted at rest, versioned, with per-tenant prefixes and retention lifecycle rules.",
+        "technology": "S3-compatible object storage with versioning"
+      },
+      {
+        "name": "Job Queue",
+        "responsibility": "Durable background execution with bounded retries, backoff, idempotency keys, and a visible dead-letter queue.",
+        "technology": "Postgres-backed queue (e.g. pg-boss)"
+      },
+      {
+        "name": "Invoice Workflow Orchestrator",
+        "responsibility": "Runs a deterministic per-invoice workflow (parse, extract, validate, match, flag, draft). Uses the LLM only inside bounded steps; checkpoints after each step so runs resume after failure.",
+        "technology": "TypeScript state machine"
+      },
+      {
+        "name": "Extraction Step (LLM)",
+        "responsibility": "Converts invoice PDF/image/text into a schema-validated JSON of fields (vendor, invoice no., dates, line items, totals, tax, PO ref) with per-field confidence. Treats document content as untrusted data and has no tool access.",
+        "technology": "Claude API with structured output; OCR fallback for scans"
+      },
+      {
+        "name": "LLM API",
+        "responsibility": "Hosted model provider accessed through a thin provider-agnostic interface.",
+        "technology": "Anthropic API"
+      },
+      {
+        "name": "Deterministic Validator",
+        "responsibility": "Checks extracted data in code: line sums equal totals, tax arithmetic, date sanity, currency, duplicate invoice detection (vendor + number + amount). Low-confidence or failed fields route to review.",
+        "technology": "Zod + plain TypeScript rules"
+      },
+      {
+        "name": "Accounting Tool Layer",
+        "responsibility": "Typed, least-privilege adapters to the accounting software: read POs/vendors, create draft entries only. Returns structured {code, message, hint} errors, applies timeouts and idempotency keys, and has no post/pay capability.",
+        "technology": "Adapters for QuickBooks Online / Xero behind one interface"
+      },
+      {
+        "name": "Accounting Software API",
+        "responsibility": "The client's system of record for POs, vendors and bills (external).",
+        "technology": "QuickBooks Online / Xero REST API"
+      },
+      {
+        "name": "PO Matcher",
+        "responsibility": "Matches invoices to POs by PO number, then vendor/amount/date heuristics; performs two-/three-way comparison with configurable tolerances and emits a match result with reasons for any mismatch. Deterministic first; the LLM only suggests candidates when no PO number exists.",
+        "technology": "TypeScript rules; optional LLM tiebreak"
+      },
+      {
+        "name": "Run State + Audit DB",
+        "responsibility": "Tenants, users, invoices, checkpoints, match results, approvals, and an append-only audit log of every model input/output, tool call and human decision. Row-level tenant isolation.",
+        "technology": "PostgreSQL with RLS, PITR backups"
+      },
+      {
+        "name": "Budget + Rate Limiter",
+        "responsibility": "Per-tenant and global caps on LLM tokens, pages per invoice, invoices per day and per-run steps; alerts at thresholds; stops runaway loops.",
+        "technology": "Postgres counters + in-process limiter"
+      },
+      {
+        "name": "Approval Queue",
+        "responsibility": "Holds invoices with match results and proposed draft entries awaiting human decision; tracks approve/reject/edit and enforces that only an approved item triggers posting.",
+        "technology": "Postgres tables"
+      },
+      {
+        "name": "Reviewer Web UI",
+        "responsibility": "Shows the source document beside extracted fields and PO, highlights mismatches, and lets accountants edit, approve or reject. Also shows the dead-letter list and per-client settings.",
+        "technology": "React web app"
+      },
+      {
+        "name": "Auth + Tenant Authorization",
+        "responsibility": "Bought authentication with SSO/MFA; roles (admin, accountant, viewer) and per-client assignment enforced in one authorization module plus DB RLS; service tokens for workers.",
+        "technology": "Managed auth provider (Clerk/Auth0/WorkOS)"
+      },
+      {
+        "name": "Draft Entry Poster",
+        "responsibility": "After approval, writes the draft bill/payment entry to the accounting software using an idempotency key, then records the external id. Reconciles on partial failure. Still creates a draft or unpaid bill, never releases funds.",
+        "technology": "Queue job using the Accounting Tool Layer"
+      },
+      {
+        "name": "Traces + Evals",
+        "responsibility": "Structured logs with PII masking, request/run ids, metrics and alerts; replayable traces and a labelled invoice eval set run on each prompt or model change.",
+        "technology": "OpenTelemetry + hosted log/metrics service; eval harness in CI"
+      },
+      {
+        "name": "Secret Manager",
+        "responsibility": "Stores OAuth refresh tokens and API keys encrypted, supports rotation, and issues them only to the components that need them.",
+        "technology": "Platform secret manager / KMS-encrypted DB column"
+      }
+    ],
+    "dataFlow": [
+      { "from": "Firm invoice mailbox", "to": "Email Ingestor", "description": "New invoice emails arrive via verified push notification or polling." },
+      { "from": "Email Ingestor", "to": "Document Store", "description": "Raw email and attachments saved after size/type checks." },
+      { "from": "Email Ingestor", "to": "Job Queue", "description": "Enqueues a processing job keyed by message-id plus attachment hash." },
+      { "from": "Job Queue", "to": "Invoice Workflow Orchestrator", "description": "Worker picks up the job; retries are idempotent." },
+      { "from": "Invoice Workflow Orchestrator", "to": "Extraction Step (LLM)", "description": "Sends document content for schema-constrained extraction." },
+      { "from": "Extraction Step (LLM)", "to": "LLM API", "description": "Model call with timeout and token budget." },
+      { "from": "Invoice Workflow Orchestrator", "to": "Deterministic Validator", "description": "Extracted fields are checked for arithmetic, format and duplicates." },
+      { "from": "Invoice Workflow Orchestrator", "to": "PO Matcher", "description": "Validated invoice is compared with candidate POs." },
+      { "from": "PO Matcher", "to": "Accounting Tool Layer", "description": "Read-only fetch of POs and vendors." },
+      { "from": "Accounting Tool Layer", "to": "Accounting Software API", "description": "Authenticated API calls with timeouts and structured errors." },
+      { "from": "Invoice Workflow Orchestrator", "to": "Run State + Audit DB", "description": "Checkpoints after each step and audit entries for all inputs, outputs and tool calls." },
+      { "from": "Invoice Workflow Orchestrator", "to": "Budget + Rate Limiter", "description": "Checks and records token and step spend before each model call." },
+      { "from": "Invoice Workflow Orchestrator", "to": "Approval Queue", "description": "Submits match result, flags and proposed draft entry for review." },
+      { "from": "Approval Queue", "to": "Reviewer Web UI", "description": "Reviewer sees the item with source document and mismatches." },
+      { "from": "Reviewer Web UI", "to": "Auth + Tenant Authorization", "description": "Every request is authenticated and authorized for the tenant and client." },
+      { "from": "Reviewer Web UI", "to": "Approval Queue", "description": "Approve, edit or reject decision recorded with user id." },
+      { "from": "Approval Queue", "to": "Draft Entry Poster", "description": "Approved items enqueue a posting job." },
+      { "from": "Draft Entry Poster", "to": "Accounting Tool Layer", "description": "Creates the draft bill with an idempotency key." },
+      { "from": "Invoice Workflow Orchestrator", "to": "Traces + Evals", "description": "Emits traces and metrics; traces feed replay tests." },
+      { "from": "Secret Manager", "to": "Accounting Tool Layer", "description": "Provides per-tenant OAuth credentials at call time." },
+      { "from": "Secret Manager", "to": "Email Ingestor", "description": "Provides mailbox OAuth credentials." }
+    ],
+    "decisions": [
+      {
+        "decision": "Use a deterministic workflow with LLM steps instead of a free-form tool-calling agent loop",
+        "rationale": "The steps (ingest, extract, validate, match, flag, draft) are known and fixed. A workflow is cheaper, faster, testable and has no runaway-loop risk. The LLM is used only for extraction and optional PO candidate suggestion.",
+        "tradeoffs": "Less flexibility for odd cases such as unusual documents; those route to human review rather than being solved autonomously.",
+        "alternativesRejected": [
+          "Single autonomous agent with the full toolset",
+          "Multi-agent system with extractor, matcher and drafter agents"
+        ]
+      },
+      {
+        "decision": "The system can only create drafts; it never posts, pays or releases funds, and posting requires a recorded human approval",
+        "rationale": "Financial mistakes are costly and hard to reverse. Enforcing this in the tool layer's capabilities (no pay/post method exists) and credential scopes makes prompt injection unable to move money.",
+        "tradeoffs": "Humans remain in the loop, limiting full automation; some accounting APIs have no true draft state, so a bill in unpaid/draft status is used.",
+        "alternativesRejected": [
+          "Auto-approve high-confidence matches",
+          "Direct payment initiation via bank API"
+        ]
+      },
+      {
+        "decision": "Deterministic validation and matching in code; LLM output is never trusted for arithmetic or the final match decision",
+        "rationale": "Extraction errors (misread digits) are the main accuracy risk. Recomputing sums, taxes and duplicates in code catches them cheaply and is auditable.",
+        "tradeoffs": "More rules to maintain and tune tolerances per client.",
+        "alternativesRejected": [
+          "Ask the LLM to decide match/mismatch end to end"
+        ]
+      },
+      {
+        "decision": "Single Postgres for app data, queue, state and audit log; S3-compatible storage for files",
+        "rationale": "Small-firm scale (hundreds to low thousands of invoices a day) fits one managed Postgres. Fewer moving parts and low idle cost; transactional enqueueing avoids dual-write inconsistency.",
+        "tradeoffs": "Postgres is a single point of failure and the queue shares capacity with the app; mitigated by managed HA, PITR and a later move to a dedicated queue if needed.",
+        "alternativesRejected": [
+          "Kafka or SQS plus separate stores",
+          "Redis-based queue",
+          "Microservices"
+        ]
+      },
+      {
+        "decision": "Buy authentication; enforce tenant isolation by an authorization module plus Postgres row-level security",
+        "rationale": "Accounting firms handle many clients' financial data, so cross-client leakage is the worst security outcome. Two layers (app check and RLS) make a single bug less likely to leak data.",
+        "tradeoffs": "RLS adds complexity to migrations and testing; auth vendor adds cost and dependency.",
+        "alternativesRejected": [
+          "Custom password auth",
+          "Application-only tenant filtering"
+        ]
+      },
+      {
+        "decision": "Adapter interface over accounting software, starting with one provider (QuickBooks Online), second (Xero) later",
+        "rationale": "Accounting API is the key external dependency; a narrow interface limits lock-in and keeps the matcher independent of vendor data models.",
+        "tradeoffs": "Lowest-common-denominator abstraction may hide provider-specific features; initial delivery covers only one provider.",
+        "alternativesRejected": [
+          "Hard-code QuickBooks calls throughout",
+          "Third-party unified accounting API from day one"
+        ]
+      },
+      {
+        "decision": "Treat all email and document content as untrusted; the extraction step has no tools and outputs only schema-validated JSON",
+        "rationale": "Invoices come from outside parties and may contain injected instructions. Isolating the model that reads them from any action capability removes the injection impact path beyond wrong field values, which validation and human review catch.",
+        "tradeoffs": "Cannot let the model dynamically explore data during extraction.",
+        "alternativesRejected": [
+          "Give the extraction model direct read access to the accounting tools"
+        ]
+      },
+      {
+        "decision": "Idempotency and checkpointing at every external side effect (email message-id dedupe, job keys, draft entry idempotency key with reconciliation)",
+        "rationale": "Mail webhooks and queue retries duplicate events; a duplicated draft bill is a real financial error.",
+        "tradeoffs": "Extra bookkeeping columns and a reconciliation step after ambiguous failures.",
+        "alternativesRejected": [
+          "Rely on at-least-once semantics and manual cleanup"
+        ]
+      },
+      {
+        "decision": "Per-tenant budgets and input limits (max attachment size, pages, invoices/day) with alerts",
+        "rationale": "A mailbox flooded with large PDFs or spam would otherwise generate unbounded LLM cost.",
+        "tradeoffs": "Legitimate bursts (month end) may be delayed and require limit tuning.",
+        "alternativesRejected": [
+          "Unlimited processing with after-the-fact billing review"
+        ]
+      },
+      {
+        "decision": "Eval set and replayable traces are required before changing prompts or models; model access via a thin provider interface",
+        "rationale": "Extraction accuracy is the product quality; regressions must be caught on labelled invoices. Replay from logged inputs makes incidents debuggable.",
+        "tradeoffs": "Needs ongoing labelling effort and storing sensitive documents in test fixtures (anonymized).",
+        "alternativesRejected": [
+          "Manual spot checks only"
+        ]
+      }
+    ],
+    "risks": [
+      {
+        "risk": "Extraction misreads a number (amount, PO number, bank detail) and a reviewer approves it out of habit, leading to wrong bills; reviewer fatigue grows as automation looks reliable.",
+        "category": "data",
+        "likelihood": "high",
+        "mitigation": "Recompute totals in code, show source-vs-extracted side by side with low-confidence fields highlighted, force re-confirmation of changed vendor bank details, and track per-field correction rates on a dashboard with a weekly eval run on a labelled set."
+      },
+      {
+        "risk": "Cross-client data exposure: a bug or an over-scoped accounting token lets a user or the pipeline read another client's POs or invoices.",
+        "category": "security",
+        "likelihood": "medium",
+        "mitigation": "Enforce tenant and client scoping in one authorization module plus Postgres RLS, store one OAuth token per client with minimal scopes, and add automated cross-tenant access tests in CI."
+      },
+      {
+        "risk": "Prompt injection or fraudulent invoices (fake vendor, changed bank account, hidden instructions in PDFs) pass through to approval.",
+        "category": "security",
+        "likelihood": "medium",
+        "mitigation": "Keep the extraction model tool-less with schema-only output, flag new vendors and changed bank details and sender-domain mismatches for mandatory review, and have no post/pay capability in the tool layer."
+      },
+      {
+        "risk": "Accounting API dependency: QuickBooks/Xero outage, rate limits, token expiry or API/pricing changes stall matching and posting for all clients.",
+        "category": "vendor",
+        "likelihood": "medium",
+        "mitigation": "Use the adapter interface, cache PO snapshots with timestamps, handle token refresh failures with a visible reconnect prompt, queue with backoff, and revisit a second provider or unified API if a single vendor's terms change."
+      },
+      {
+        "risk": "LLM cost per invoice grows faster than revenue because of scanned multi-page PDFs, spam floods or retry storms.",
+        "category": "cost",
+        "likelihood": "medium",
+        "mitigation": "Enforce page and size caps, filter non-invoice mail with a cheap classifier before extraction, use a smaller model first with escalation only on low confidence, apply per-tenant daily token budgets with alerts at 70% and 100%, and track cost per invoice as a metric."
+      }
+    ],
+    "openQuestions": [
+      "Assumed scale: 5-50 firms, up to ~2,000 invoices/day total, mostly PDF attachments; revisit if volume is higher.",
+      "Assumed first accounting integration is QuickBooks Online, with Xero second; confirm actual client mix.",
+      "Assumed Gmail and Microsoft 365 are the mailbox providers via OAuth, not IMAP forwarding.",
+      "Assumed 'payment entry' means a draft bill or unpaid payment record in the accounting software, never an actual bank payment.",
+      "Assumed a single human approval is enough; no two-person approval above a threshold (configurable later).",
+      "Assumed a single cloud region with managed Postgres HA and daily backups plus PITR; no multi-region.",
+      "Assumed English-language invoices and common currencies; multi-language and FX handling are out of scope initially.",
+      "Assumed retention of 7 years for invoices and audit records, subject to the firm's local rules; deletion on client offboarding within 30 days except legally required records.",
+      "Assumed GDPR/CCPA basics apply; no HIPAA or PCI. SOC 2 may be requested by firms later.",
+      "Assumed hosted LLM API use is acceptable to firms' clients under a data-processing agreement with zero-training terms.",
+      "Assumed staging and production environments plus local; deploys are rolling with a one-step rollback.",
+      "Assumed three-way matching (goods receipt) is only used if the accounting software already holds receipts; otherwise two-way PO matching.",
+      "Not needed initially: bot and signup-abuse protection beyond provider rate limits, since accounts are invite-only for firm staff; public signup is disabled.",
+      "Not needed initially: search index or analytics warehouse, so deletion only covers Postgres, object storage, backups (expiring by retention window) and the LLM provider (no retention)."
+    ]
+  }
+}
+```

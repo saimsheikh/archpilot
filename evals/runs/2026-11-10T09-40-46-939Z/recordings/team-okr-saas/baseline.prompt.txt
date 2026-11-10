@@ -1,0 +1,3 @@
+Draw me an architecture diagram for this project. Use Mermaid.
+
+Project: A B2B SaaS where companies set quarterly OKRs, assign them to teams, and track weekly check-ins. Companies sign up self-serve, invite colleagues, and pay per seat. Expect 300 customer companies with about 40 users each in year one.

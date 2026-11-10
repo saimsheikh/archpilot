@@ -1,0 +1,3 @@
+Draw me an architecture diagram for this project. Use Mermaid.
+
+Project: Nightly pipeline for a retail chain that pulls sales from 120 store POS systems, the e-commerce database and a marketing platform, cleans and joins them, and feeds dashboards plus a weekly demand forecast per product.

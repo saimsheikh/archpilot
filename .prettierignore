@@ -5,3 +5,6 @@ package-lock.json
 project.md
 CLAUDE.md
 evals/**/results.*
+evals/runs
+evals/results
+examples/*/ARCHITECTURE.md

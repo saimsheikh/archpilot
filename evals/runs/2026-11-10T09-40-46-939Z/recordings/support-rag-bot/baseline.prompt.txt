@@ -1,0 +1,3 @@
+Draw me an architecture diagram for this project. Use Mermaid.
+
+Project: A support assistant embedded in our help center that answers customer questions from 2,000 help articles and past resolved tickets, cites sources, and hands off to a human agent when unsure. About 5,000 questions per day.

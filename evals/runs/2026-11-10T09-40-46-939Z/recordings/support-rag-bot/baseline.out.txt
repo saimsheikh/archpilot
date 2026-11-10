@@ -1,0 +1,70 @@
+```mermaid
+flowchart LR
+    subgraph Client["Help Center"]
+        Widget["Chat Widget"]
+    end
+
+    subgraph API["Support Assistant Service"]
+        GW["API + Session Handler<br/>(auth, rate limit)"]
+        Orch["Orchestrator"]
+        Guard["Input Guardrails<br/>(PII redaction, abuse filter)"]
+        Gen["LLM Answer Generation<br/>(grounded, cites sources)"]
+        Conf{"Confidence &<br/>Citation Check"}
+    end
+
+    subgraph Retrieval["Retrieval"]
+        Hybrid["Hybrid Search<br/>(vector + keyword)"]
+        Rerank["Reranker"]
+        Index[("Search Index<br/>articles + tickets chunks")]
+    end
+
+    subgraph Ingest["Ingestion Pipeline (scheduled + on-publish)"]
+        Articles[("Help Center CMS<br/>~2,000 articles")]
+        Tickets[("Helpdesk<br/>resolved tickets")]
+        Scrub["PII Scrubber<br/>(tickets only)"]
+        Chunk["Chunk + Embed"]
+    end
+
+    subgraph Handoff["Human Handoff"]
+        HD["Helpdesk Ticket / Live Chat<br/>(with transcript + retrieved context)"]
+        Agent["Human Agent"]
+    end
+
+    subgraph Ops["Observability"]
+        Logs[("Conversation Logs<br/>+ feedback")]
+        Eval["Quality Dashboard<br/>(deflection, handoff rate, citation accuracy)"]
+    end
+
+    Widget <--> GW
+    GW --> Orch
+    Orch --> Guard
+    Guard --> Hybrid
+    Hybrid <--> Index
+    Hybrid --> Rerank
+    Rerank --> Gen
+    Gen --> Conf
+    Conf -- "confident + cited" --> GW
+    Conf -- "low confidence / no sources / user asks" --> HD
+    HD --> Agent
+    Agent -. "resolution" .-> Tickets
+
+    Articles --> Chunk
+    Tickets --> Scrub --> Chunk
+    Chunk --> Index
+
+    Orch --> Logs
+    Conf --> Logs
+    Widget -. "thumbs up/down" .-> Logs
+    Logs --> Eval
+```
+
+**Key design points**
+
+- **Scale is modest.** 5,000 questions/day is about 0.06 req/s on average, with maybe a few req/s at peak. One stateless service plus a managed vector/search index is enough. No queues or autoscaling clusters are needed on the query path.
+- **Hybrid retrieval.** Keyword search catches exact product names and error codes, and vectors catch paraphrases. A reranker then picks the top few chunks.
+- **Handoff is a first-class path.** The `Confidence & Citation Check` step routes to a human when retrieval is weak, the answer can't be tied to sources, or the user asks for a person. The agent receives the transcript and retrieved context.
+- **Ticket data is scrubbed before indexing.** Resolved tickets carry customer PII, so they pass through the scrubber before chunking.
+- **Closed loop.** Agent resolutions of handed-off tickets flow back into the corpus on the next ingestion run, so the assistant improves on the questions it couldn't answer.
+- **Freshness.** Articles re-index on publish, and tickets re-index on a nightly schedule.
+
+I can also split this into separate query-time and ingestion diagrams, or write it to a file in the repo if you'd like.

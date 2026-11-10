@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    env:
+      # GitHub's Ubuntu runners block Chromium's user-namespace sandbox, so run without it.
+      ARCHPILOT_PUPPETEER_CONFIG: ${{ github.workspace }}/.github/puppeteer-ci.json
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # Explicit install: newer npm versions skip puppeteer's download script.
+      - name: Install headless Chromium for mermaid-cli
+        run: npx puppeteer browsers install chrome-headless-shell
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:e2e
+      - name: Verify the packed package installs and runs
+        if: matrix.node == 24
+        run: npm run verify:pack

@@ -1,0 +1,3 @@
+Draw me an architecture diagram for this project. Use Mermaid.
+
+Project: A two-sided marketplace connecting students with independent tutors: search by subject and price, book and pay for sessions, video lessons via a third-party provider, reviews, and payouts to tutors minus a commission.

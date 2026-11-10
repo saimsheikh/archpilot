@@ -1,0 +1,89 @@
+```mermaid
+flowchart TB
+    subgraph Clients
+        Web["Web App (student + tutor)"]
+        Mobile["Mobile App"]
+    end
+
+    CDN["CDN / Static Assets"]
+    GW["API Gateway / Load Balancer"]
+
+    subgraph Backend["Backend: modular monolith"]
+        Auth["Auth & Users"]
+        Profiles["Tutor Profiles & Availability"]
+        Search["Search (subject, price)"]
+        Booking["Booking & Scheduling"]
+        Payments["Payments & Commission"]
+        Lessons["Lesson Sessions"]
+        Reviews["Reviews & Ratings"]
+        Payouts["Payouts"]
+        Notify["Notifications"]
+        Hooks["Webhook Handlers"]
+    end
+
+    subgraph Async["Async"]
+        Queue[("Job Queue (Redis)")]
+        Worker["Background Workers"]
+    end
+
+    subgraph Data["Data Stores"]
+        DB[("PostgreSQL")]
+        Index[("Search Index")]
+        Cache[("Redis Cache")]
+        Blob[("Object Storage: avatars, docs")]
+    end
+
+    subgraph External["Third-party Services"]
+        PSP["Payment Provider with Connect (e.g. Stripe)"]
+        Video["Video Provider (e.g. Daily / Twilio)"]
+        Email["Email / SMS Provider"]
+    end
+
+    Web --> CDN
+    Mobile --> GW
+    Web --> GW
+    GW --> Auth
+    GW --> Profiles
+    GW --> Search
+    GW --> Booking
+    GW --> Lessons
+    GW --> Reviews
+    GW --> Hooks
+
+    Auth --> DB
+    Profiles --> DB
+    Profiles --> Blob
+    Profiles -- "sync" --> Queue
+    Search --> Index
+    Search --> Cache
+    Booking --> DB
+    Booking --> Payments
+    Payments --> PSP
+    Payments --> DB
+    Lessons --> Video
+    Lessons --> DB
+    Reviews --> DB
+    Reviews -- "update rating" --> Queue
+
+    PSP -- "payment events" --> Hooks
+    Video -- "session events" --> Hooks
+    Hooks --> Queue
+
+    Queue --> Worker
+    Worker --> Index
+    Worker --> Payouts
+    Worker --> Notify
+    Payouts -- "net of commission" --> PSP
+    Payouts --> DB
+    Notify --> Email
+```
+
+**Key decisions**
+
+- **Modular monolith, not microservices.** The domains are clearly separated, but a small team gets simpler deploys and transactions this way. Modules can be split out later, with payments the most likely first candidate.
+- **Payment provider with marketplace support (Stripe Connect or similar).** It handles tutor onboarding, KYC, tax forms, and split payments. The commission is taken as an application fee, so you never hold funds or build your own ledger.
+- **Payout flow.** A completed lesson (signaled by a video-provider webhook) triggers a worker job that releases the tutor's share minus commission. Holding funds until the lesson is done also gives you a refund and dispute window.
+- **Webhooks go through the queue.** Payment and video events are verified, stored idempotently, and processed asynchronously so retries and duplicates are safe.
+- **Search starts in Postgres.** Subject and price filters work with Postgres full-text search and indexes. The separate search index in the diagram is optional until the catalog grows.
+
+I can also produce a sequence diagram for the booking → payment → lesson → payout flow, or an ER diagram for the core data model.

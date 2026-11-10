@@ -1,0 +1,52 @@
+[
+  {
+    "id": "team-okr-saas",
+    "kind": "SaaS",
+    "description": "A B2B SaaS where companies set quarterly OKRs, assign them to teams, and track weekly check-ins. Companies sign up self-serve, invite colleagues, and pay per seat. Expect 300 customer companies with about 40 users each in year one."
+  },
+  {
+    "id": "support-rag-bot",
+    "kind": "RAG app",
+    "description": "A support assistant embedded in our help center that answers customer questions from 2,000 help articles and past resolved tickets, cites sources, and hands off to a human agent when unsure. About 5,000 questions per day."
+  },
+  {
+    "id": "habit-mobile-app",
+    "kind": "Mobile app",
+    "description": "An iOS and Android habit tracker with streaks, reminders via push notifications, optional sync across devices, and a premium subscription through the app stores. Target 200k monthly active users."
+  },
+  {
+    "id": "tutor-marketplace",
+    "kind": "Marketplace",
+    "description": "A two-sided marketplace connecting students with independent tutors: search by subject and price, book and pay for sessions, video lessons via a third-party provider, reviews, and payouts to tutors minus a commission."
+  },
+  {
+    "id": "retail-sales-pipeline",
+    "kind": "Data pipeline",
+    "description": "Nightly pipeline for a retail chain that pulls sales from 120 store POS systems, the e-commerce database and a marketing platform, cleans and joins them, and feeds dashboards plus a weekly demand forecast per product."
+  },
+  {
+    "id": "invoice-agent",
+    "kind": "Agent product",
+    "description": "An AI agent for small accounting firms that reads incoming invoices from email, extracts the fields, matches them against purchase orders in the client's accounting software, flags mismatches, and drafts payment entries for a human to approve."
+  },
+  {
+    "id": "warehouse-admin-tool",
+    "kind": "Internal tool",
+    "description": "An internal tool for 60 warehouse and support staff to look up orders, change shipping addresses, issue refunds up to a limit, and see an audit trail of every change. Must use the company's Google Workspace login."
+  },
+  {
+    "id": "live-quiz-app",
+    "kind": "Realtime app",
+    "description": "A live quiz app for classrooms and events: a host runs a quiz, up to 500 players join with a code on their phones, answer within 20 seconds, and see a live leaderboard update after each question."
+  },
+  {
+    "id": "clinic-booking",
+    "kind": "Healthcare web app",
+    "description": "Online appointment booking for a network of 15 physiotherapy clinics: patients pick a therapist and time slot, get SMS reminders, fill intake forms with health information, and clinics manage schedules. Patient data is sensitive and must stay in the EU."
+  },
+  {
+    "id": "iot-fleet-monitoring",
+    "kind": "Event-driven system",
+    "description": "Fleet monitoring for 5,000 delivery vans that send GPS and engine telemetry every 10 seconds; dispatchers see vans on a live map, get alerts for engine faults or route deviations, and managers get weekly utilization reports."
+  }
+]

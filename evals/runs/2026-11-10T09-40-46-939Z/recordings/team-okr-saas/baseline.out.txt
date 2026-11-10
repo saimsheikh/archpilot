@@ -1,0 +1,79 @@
+12,000 users in year one is small, so I kept this to a single modular monolith on one managed Postgres instead of microservices.
+
+```mermaid
+flowchart TB
+    subgraph Clients
+        Web["Web App (SPA)"]
+    end
+
+    subgraph Edge
+        CDN["CDN / Static Hosting"]
+        LB["Load Balancer / TLS"]
+    end
+
+    subgraph App["Application (modular monolith, 2+ stateless instances)"]
+        Auth["Auth & Sessions<br/>(signup, login, invites, SSO later)"]
+        Org["Organizations & Membership<br/>(roles: admin, manager, member)"]
+        OKR["OKRs<br/>(objectives, key results, quarters)"]
+        Teams["Teams & Assignments"]
+        Checkins["Weekly Check-ins<br/>(progress, confidence, notes)"]
+        Billing["Billing<br/>(per-seat subscription, seat sync)"]
+        Notify["Notifications<br/>(reminders, invites, digests)"]
+    end
+
+    subgraph Async["Background Work"]
+        Queue[("Job Queue")]
+        Worker["Workers<br/>(weekly reminders, seat count sync,<br/>email sending, rollups)"]
+        Cron["Scheduler<br/>(weekly check-in cycle, quarter rollover)"]
+    end
+
+    subgraph Data
+        PG[("PostgreSQL<br/>tenant_id on every row")]
+        Cache[("Redis<br/>sessions, cache, queue backend")]
+    end
+
+    subgraph External["External Services"]
+        Stripe["Stripe<br/>(subscriptions, invoices, webhooks)"]
+        Email["Email Provider<br/>(Postmark / SES)"]
+        Obs["Logging, Metrics, Error Tracking"]
+    end
+
+    Web --> CDN
+    Web -->|HTTPS / JSON API| LB
+    LB --> App
+
+    Auth --> Org
+    Org --> Teams
+    Teams --> OKR
+    OKR --> Checkins
+    Org -->|seat added/removed| Billing
+    Checkins --> Notify
+    Org --> Notify
+
+    App --> PG
+    App --> Cache
+    App -->|enqueue| Queue
+    Cron --> Queue
+    Queue --> Worker
+    Worker --> PG
+    Worker --> Email
+    Worker --> Billing
+
+    Billing -->|create/update subscription, quantity| Stripe
+    Stripe -->|webhooks: payment, cancel, failure| LB
+    Notify --> Queue
+
+    App -.-> Obs
+    Worker -.-> Obs
+```
+
+**Key decisions**
+
+- **Modular monolith**: At this scale, one deployable with clear module boundaries is cheaper to run and easier to change. The boundaries let you split out Billing or Notifications later if needed.
+- **Multi-tenancy**: One shared Postgres with a `tenant_id` (company) on every table. Enforce it in a single data-access layer, and consider Postgres row-level security as a backstop against cross-tenant leaks.
+- **Per-seat billing**: Stripe owns subscriptions and invoicing. Your app syncs the seat count (active members) to the Stripe subscription quantity whenever someone is invited, accepted, or removed. Handle Stripe webhooks to gate access on failed payments.
+- **Self-serve onboarding**: Signup creates the organization and its first admin. Invites are emailed tokens, and accepting one adds a seat.
+- **Background jobs**: Weekly check-in reminders, digests, and the quarter rollover run on a scheduler and queue, so request latency isn't affected. Redis can back the queue to avoid another piece of infrastructure.
+- **Load**: Check-ins peak around the weekly cycle, but 12k users is well within one Postgres instance and a couple of app instances. Add read replicas or caching of rollup views only if dashboards get slow.
+
+If you'd like, I can save this to a file (for example `docs/architecture.md`), or produce a data model (ERD) or a sequence diagram of the invite-to-billing flow.
