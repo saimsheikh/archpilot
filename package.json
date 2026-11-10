@@ -1,14 +1,14 @@
 {
-  "name": "planfirst-mcp",
+  "name": "archpilot-mcp",
   "version": "0.0.0",
   "description": "Plan before you code: interview, architecture, pre-mortem, and a validated diagram as a contract.",
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "bin": {
-    "planfirst-mcp": "dist/index.js"
+    "archpilot-mcp": "dist/index.js"
   },
   "files": [
     "dist",
@@ -25,6 +25,7 @@
     "test:e2e": "npm run build && vitest run tests/e2e"
   },
   "dependencies": {
+    "@mermaid-js/mermaid-cli": "^12.2.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "zod": "^4.6.7"
   },

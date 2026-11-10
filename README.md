@@ -1,6 +1,6 @@
-# planfirst
+# archpilot
 
-Plan before you code. planfirst is a Claude Code Skill plus an MCP server that interviews you about
+Plan before you code. archpilot is a Claude Code Skill plus an MCP server that interviews you about
 your idea, proposes an architecture with trade-offs and a pre-mortem, and outputs a validated
 diagram plus an `ARCHITECTURE.md` your coding agent follows as a contract.
 
@@ -28,7 +28,7 @@ Build first, then run this from the repo root (use an absolute path):
 
 ```bash
 npm run build
-claude mcp add planfirst -- node /absolute/path/to/repo/dist/index.js
+claude mcp add archpilot -- node /absolute/path/to/repo/dist/index.js
 ```
 
 Add `--scope user` to make it available in every project. Check with `claude mcp list`.

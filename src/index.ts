@@ -8,6 +8,6 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   // stdout carries the MCP protocol, so diagnostics must go to stderr.
-  console.error("planfirst-mcp failed to start:", error instanceof Error ? error.message : error);
+  console.error("archpilot-mcp failed to start:", error instanceof Error ? error.message : error);
   process.exit(1);
 });
