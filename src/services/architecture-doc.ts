@@ -72,15 +72,15 @@ function componentsSection(doc: ArchitectureDoc): string {
   const rows = doc.components.map(
     (c) => `| ${cell(c.name)} | ${cell(c.responsibility)} | ${cell(c.technology ?? "TBD")} |`,
   );
-  return ["| Component | Responsibility | Technology |", "| --- | --- | --- |", ...rows].join(
-    "\n",
-  );
+  return ["| Component | Responsibility | Technology |", "| --- | --- | --- |", ...rows].join("\n");
 }
 
 function dataFlowSection(doc: ArchitectureDoc): string {
   if (doc.dataFlow.length === 0) return "_Not specified._";
   return doc.dataFlow
-    .map((step, index) => `${String(index + 1)}. **${step.from} → ${step.to}**: ${step.description}`)
+    .map(
+      (step, index) => `${String(index + 1)}. **${step.from} → ${step.to}**: ${step.description}`,
+    )
     .join("\n");
 }
 
@@ -105,9 +105,11 @@ function risksSection(doc: ArchitectureDoc): string {
   const rows = doc.risks.map(
     (r) => `| ${cell(r.risk)} | ${r.category} | ${r.likelihood} | ${cell(r.mitigation)} |`,
   );
-  return ["| Risk | Category | Likelihood | Mitigation |", "| --- | --- | --- | --- |", ...rows].join(
-    "\n",
-  );
+  return [
+    "| Risk | Category | Likelihood | Mitigation |",
+    "| --- | --- | --- | --- |",
+    ...rows,
+  ].join("\n");
 }
 
 function diagramSection(doc: ArchitectureDoc, diagramLink: string | undefined): string {

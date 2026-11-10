@@ -1,14 +1,19 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config.js";
+import { loadPatterns } from "./patterns/pattern-loader.js";
 import { MermaidRenderer } from "./renderers/mermaid/mermaid-renderer.js";
+import { createRetriever } from "./services/retrieval/create-retriever.js";
 import { createServer } from "./server.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  const patterns = await loadPatterns();
   const server = createServer({
     renderer: new MermaidRenderer(config.renderer),
     projectRoot: config.projectRoot,
+    patterns,
+    retriever: createRetriever(config.retriever, patterns),
   });
   await server.connect(new StdioServerTransport());
 }

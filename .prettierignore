@@ -4,3 +4,4 @@ coverage
 package-lock.json
 project.md
 CLAUDE.md
+evals/**/results.*

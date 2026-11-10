@@ -1,6 +1,7 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fail, ok, type Result } from "../../shared/result.js";
+import { Semaphore } from "../../shared/semaphore.js";
 import { withTempDir } from "../../shared/temp-dir.js";
 import type {
   DiagramError,
@@ -17,6 +18,8 @@ export interface MermaidRendererOptions {
   timeoutMs: number;
   maxSourceBytes: number;
   maxOutputBytes: number;
+  /** Each render starts a Chromium instance, so parallel renders are capped. */
+  maxConcurrentRenders: number;
   /** Optional puppeteer launch config, e.g. `--no-sandbox` inside CI containers. */
   puppeteerConfigPath?: string | undefined;
 }
@@ -25,6 +28,7 @@ export const DEFAULT_MERMAID_OPTIONS: MermaidRendererOptions = {
   timeoutMs: 60_000,
   maxSourceBytes: 50_000,
   maxOutputBytes: 10 * 1024 * 1024,
+  maxConcurrentRenders: 2,
 };
 
 // Strict mode disables click callbacks and raw HTML in labels; diagram directives cannot lower it.
@@ -32,9 +36,11 @@ const MERMAID_CONFIG = JSON.stringify({ securityLevel: "strict" });
 
 export class MermaidRenderer implements DiagramRenderer {
   private readonly options: MermaidRendererOptions;
+  private readonly slots: Semaphore;
 
   constructor(options: Partial<MermaidRendererOptions> = {}) {
     this.options = { ...DEFAULT_MERMAID_OPTIONS, ...options };
+    this.slots = new Semaphore(this.options.maxConcurrentRenders);
   }
 
   async validate(source: string): Promise<Result<ValidDiagram, DiagramError>> {
@@ -58,7 +64,7 @@ export class MermaidRenderer implements DiagramRenderer {
     source: string,
     format: DiagramFormat,
   ): Promise<Result<RenderedDiagram, DiagramError>> {
-    return withTempDir((dir) => this.renderInDir(dir, source, format));
+    return this.slots.run(() => withTempDir((dir) => this.renderInDir(dir, source, format)));
   }
 
   private async renderInDir(

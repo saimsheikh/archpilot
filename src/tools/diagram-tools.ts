@@ -2,9 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { DIAGRAM_FORMATS } from "../renderers/diagram-renderer.js";
 import type { DiagramService } from "../services/diagram-service.js";
-import { toToolResult } from "./tool-result.js";
+import { runTool } from "./tool-result.js";
 
-const source = z.string().describe("Mermaid diagram source");
+// Generous transport-level cap; the renderer enforces the real (configurable) source limit.
+const source = z.string().max(500_000).describe("Mermaid diagram source");
 
 export function registerDiagramTools(server: McpServer, diagrams: DiagramService): void {
   server.registerTool(
@@ -16,7 +17,7 @@ export function registerDiagramTools(server: McpServer, diagrams: DiagramService
       inputSchema: { source },
       annotations: { readOnlyHint: true },
     },
-    async (input) => toToolResult(await diagrams.validate(input.source)),
+    (input) => runTool("validate_diagram", () => diagrams.validate(input.source)),
   );
 
   server.registerTool(
@@ -30,13 +31,14 @@ export function registerDiagramTools(server: McpServer, diagrams: DiagramService
         format: z.enum(DIAGRAM_FORMATS).default("svg"),
         outputPath: z
           .string()
+          .max(500)
           .optional()
           .describe("Project-relative path. Defaults to docs/architecture/diagram.<format>"),
       },
     },
-    async (input) =>
-      toToolResult(
-        await diagrams.render({
+    (input) =>
+      runTool("render_diagram", () =>
+        diagrams.render({
           source: input.source,
           format: input.format,
           outputPath: input.outputPath ?? `docs/architecture/diagram.${input.format}`,

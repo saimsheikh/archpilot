@@ -1,0 +1,43 @@
+[
+  {
+    "retriever": "bm25",
+    "cases": 20,
+    "top1": 0.85,
+    "top3": 1,
+    "misses": [
+      {
+        "query": "A project management tool sold to companies, each company has its own workspace, admins invite teammates and pay monthly per seat",
+        "expected": "multi-tenant-saas",
+        "got": ["internal-admin-tool", "multi-tenant-saas", "rag-app"]
+      },
+      {
+        "query": "Ingest IoT sensor readings from devices and fan them out to alerting, storage and billing consumers",
+        "expected": "event-driven-pipeline",
+        "got": ["multi-tenant-saas", "event-driven-pipeline", "rag-app"]
+      },
+      {
+        "query": "Google Docs style editor where multiple people type in the same document at the same time",
+        "expected": "realtime-collaboration",
+        "got": ["rag-app", "realtime-collaboration", "data-ml-pipeline"]
+      }
+    ]
+  },
+  {
+    "retriever": "keyword+tags",
+    "cases": 20,
+    "top1": 0.9,
+    "top3": 1,
+    "misses": [
+      {
+        "query": "A project management tool sold to companies, each company has its own workspace, admins invite teammates and pay monthly per seat",
+        "expected": "multi-tenant-saas",
+        "got": ["internal-admin-tool", "agent-system", "multi-tenant-saas"]
+      },
+      {
+        "query": "Ingest IoT sensor readings from devices and fan them out to alerting, storage and billing consumers",
+        "expected": "event-driven-pipeline",
+        "got": ["multi-tenant-saas", "mobile-api-backend", "event-driven-pipeline"]
+      }
+    ]
+  }
+]

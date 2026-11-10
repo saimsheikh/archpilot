@@ -1,0 +1,82 @@
+[
+  {
+    "query": "A chatbot for our support team that answers questions from our help center articles and links to the source page",
+    "expected": "rag-app"
+  },
+  {
+    "query": "Lawyers upload thousands of contracts and want to ask questions like which ones have a termination clause",
+    "expected": "rag-app"
+  },
+  {
+    "query": "Semantic search over our engineering wiki and Slack exports with answers grounded in citations",
+    "expected": "rag-app"
+  },
+  {
+    "query": "A project management tool sold to companies, each company has its own workspace, admins invite teammates and pay monthly per seat",
+    "expected": "multi-tenant-saas"
+  },
+  {
+    "query": "B2B invoicing platform where every customer organization must only ever see its own data, with SSO for enterprise plans",
+    "expected": "multi-tenant-saas"
+  },
+  {
+    "query": "When an order is placed we need to charge the card, send a confirmation email, update inventory and notify the warehouse, all independently",
+    "expected": "event-driven-pipeline"
+  },
+  {
+    "query": "Decouple our microservices so they react to things like user signed up or payment failed without calling each other directly",
+    "expected": "event-driven-pipeline"
+  },
+  {
+    "query": "Ingest IoT sensor readings from devices and fan them out to alerting, storage and billing consumers",
+    "expected": "event-driven-pipeline"
+  },
+  {
+    "query": "An AI assistant that can read a user's calendar, draft emails and book meetings by calling APIs on their behalf",
+    "expected": "agent-system"
+  },
+  {
+    "query": "LLM that triages GitHub issues, reproduces bugs in a sandbox and opens a pull request with a fix",
+    "expected": "agent-system"
+  },
+  {
+    "query": "A fitness tracking app for iPhone and Android with user accounts, workout history sync and reminder notifications",
+    "expected": "mobile-api-backend"
+  },
+  {
+    "query": "Food delivery customer app built in React Native that uploads photos and works on bad cellular connections",
+    "expected": "mobile-api-backend"
+  },
+  {
+    "query": "Combine data from Stripe, our Postgres database and HubSpot every night into a warehouse for revenue dashboards",
+    "expected": "data-ml-pipeline"
+  },
+  {
+    "query": "Train a churn prediction model weekly on customer behavior data and write the scores back for the sales team",
+    "expected": "data-ml-pipeline"
+  },
+  {
+    "query": "Recommendation model for an online shop: nightly feature computation, retraining and batch predictions",
+    "expected": "data-ml-pipeline"
+  },
+  {
+    "query": "A shared whiteboard where a team draws together and sees each other's cursors live",
+    "expected": "realtime-collaboration"
+  },
+  {
+    "query": "Google Docs style editor where multiple people type in the same document at the same time",
+    "expected": "realtime-collaboration"
+  },
+  {
+    "query": "Our support staff need a back office screen to look up customers, issue refunds and reset accounts",
+    "expected": "internal-admin-tool"
+  },
+  {
+    "query": "Operations team wants a simple internal dashboard to edit product catalog records and see who changed what",
+    "expected": "internal-admin-tool"
+  },
+  {
+    "query": "Finance needs a tool to approve vendor payouts with an audit trail, only used by about twenty employees",
+    "expected": "internal-admin-tool"
+  }
+]

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 /** Runs `work` inside a fresh private temp directory that is always removed afterwards. */
 export async function withTempDir<T>(work: (dir: string) => Promise<T>): Promise<T> {
-  const dir = await mkdtemp(join(tmpdir(), "archpilot-"));
+  const dir = await mkdtemp(join(tmpdir(), "archpilot-render-"));
   try {
     return await work(dir);
   } finally {
