@@ -1,13 +1,19 @@
 import { writeFile } from "node:fs/promises";
-import { dirname, relative, resolve, sep } from "node:path";
+import { posix } from "node:path";
 import { ok, type Result } from "../shared/result.js";
 import { renderArchitectureDoc, type ArchitectureDoc } from "./architecture-doc.js";
-import { toProjectRelative } from "./diagram-service.js";
 import { resolveOutputPath, type OutputPathError } from "./output-path.js";
 
 export interface ExportedDoc {
+  /** Project-relative path with forward slashes. */
   path: string;
   bytes: number;
+}
+
+/** Diagram path as seen from the document's folder, so the image link resolves on GitHub. */
+function linkFromDoc(docPath: string, diagramPath: string): string {
+  const diagram = posix.normalize(diagramPath.replace(/\\/g, "/"));
+  return posix.relative(posix.dirname(docPath), diagram);
 }
 
 export class ArchitectureService {
@@ -20,17 +26,9 @@ export class ArchitectureService {
     const target = await resolveOutputPath(this.projectRoot, outputPath, [".md"]);
     if (!target.ok) return target;
 
-    const markdown = renderArchitectureDoc(doc, this.diagramLink(doc, target.value));
-    await writeFile(target.value, markdown, "utf8");
-    return ok({
-      path: toProjectRelative(this.projectRoot, target.value),
-      bytes: Buffer.byteLength(markdown, "utf8"),
-    });
-  }
-
-  private diagramLink(doc: ArchitectureDoc, docPath: string): string | undefined {
-    if (!doc.diagramPath) return undefined;
-    const diagram = resolve(this.projectRoot, doc.diagramPath);
-    return relative(dirname(docPath), diagram).split(sep).join("/");
+    const link = doc.diagramPath ? linkFromDoc(target.value.relative, doc.diagramPath) : undefined;
+    const markdown = renderArchitectureDoc(doc, link);
+    await writeFile(target.value.absolute, markdown, "utf8");
+    return ok({ path: target.value.relative, bytes: Buffer.byteLength(markdown, "utf8") });
   }
 }

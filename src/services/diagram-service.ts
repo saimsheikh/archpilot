@@ -1,5 +1,4 @@
 import { writeFile } from "node:fs/promises";
-import { relative, sep } from "node:path";
 import type {
   DiagramError,
   DiagramFormat,
@@ -16,14 +15,10 @@ export interface RenderRequest {
 }
 
 export interface RenderedFile {
-  /** Path relative to the project root, with forward slashes. */
+  /** Project-relative path with forward slashes. */
   path: string;
   format: DiagramFormat;
   bytes: number;
-}
-
-export function toProjectRelative(projectRoot: string, absolutePath: string): string {
-  return relative(projectRoot, absolutePath).split(sep).join("/");
 }
 
 export class DiagramService {
@@ -38,7 +33,7 @@ export class DiagramService {
 
   /**
    * Validates and renders in one pass: the renderer runs the same checks as `validate`
-   * before drawing, so the browser is launched once instead of twice.
+   * before drawing, so the browser launches once instead of twice.
    */
   async render(
     request: RenderRequest,
@@ -51,9 +46,9 @@ export class DiagramService {
     const rendered = await this.renderer.render(request.source, request.format);
     if (!rendered.ok) return fail(rendered.error);
 
-    await writeFile(target.value, rendered.value.data);
+    await writeFile(target.value.absolute, rendered.value.data);
     return ok({
-      path: toProjectRelative(this.projectRoot, target.value),
+      path: target.value.relative,
       format: request.format,
       bytes: rendered.value.data.length,
     });

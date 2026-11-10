@@ -10,6 +10,12 @@ export interface OutputPathError {
   hint: string;
 }
 
+export interface OutputTarget {
+  absolute: string;
+  /** Relative to the project root, with forward slashes. */
+  relative: string;
+}
+
 const OUTSIDE_HINT = "Use a relative path inside the project, e.g. docs/architecture/diagram.svg.";
 
 function isInside(root: string, target: string): boolean {
@@ -56,7 +62,7 @@ export async function resolveOutputPath(
   projectRoot: string,
   requested: string,
   allowedExtensions: readonly string[],
-): Promise<Result<string, OutputPathError>> {
+): Promise<Result<OutputTarget, OutputPathError>> {
   if (requested.trim() === "" || requested.includes("\0")) {
     return fail({
       code: "INVALID_OUTPUT_PATH",
@@ -84,5 +90,5 @@ export async function resolveOutputPath(
   if (await isSymlink(target)) return outside(requested);
 
   await mkdir(dirname(target), { recursive: true });
-  return ok(target);
+  return ok({ absolute: target, relative: relative(realRoot, target).split(sep).join("/") });
 }
