@@ -30,6 +30,17 @@ function summarize(pattern: Pattern): PatternSummary {
   };
 }
 
+export interface PatternListing {
+  patterns: PatternSummary[];
+  /** Present for queries: how to use the ranking. */
+  note?: string;
+}
+
+export const NO_MATCH_NOTE =
+  "No reference architecture matches this project strongly. Design from first principles.";
+export const JUDGE_FIT_NOTE =
+  "Ranked by keyword overlap, not by fit. Compare whenToUse with the project, pick the one that genuinely fits, or none if they do not.";
+
 export class PatternService {
   private readonly byId: ReadonlyMap<string, Pattern>;
 
@@ -40,8 +51,11 @@ export class PatternService {
     this.byId = new Map(patterns.map((pattern) => [pattern.meta.id, pattern]));
   }
 
-  /** All patterns, or the best matches for `query` ranked by the retriever. */
-  list(query: string | undefined, limit: number): Result<{ patterns: PatternSummary[] }> {
+  /**
+   * All patterns, or the best matches for `query` ranked by the retriever. Ranking is a
+   * keyword heuristic, so the note tells the model to judge fit itself rather than trust #1.
+   */
+  list(query: string | undefined, limit: number): Result<PatternListing> {
     if (!query?.trim()) return ok({ patterns: this.patterns.map(summarize).slice(0, limit) });
     const ranked = this.retriever.search(query, limit);
     return ok({
@@ -49,6 +63,7 @@ export class PatternService {
         ...summarize(pattern),
         score: Number(score.toFixed(3)),
       })),
+      note: ranked.length === 0 ? NO_MATCH_NOTE : JUDGE_FIT_NOTE,
     });
   }
 

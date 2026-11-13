@@ -60,10 +60,14 @@ stated defaults and list them as assumptions.
 
 ### 2. Match a reference architecture
 
-Call `list_patterns` with a one-paragraph summary of the project as `query`, then
-`get_pattern` on the best match (and the runner-up if scores are close).
+Call `list_patterns` with a one-paragraph summary of the project as `query` and `limit: 3`.
+The ranking is keyword overlap, not fit: read each candidate's `whenToUse` and judge it
+against the project yourself. A healthcare booking app is not a data pipeline just because
+both mention reports.
 
-- Say which pattern you chose and why, in one or two sentences.
+- Call `get_pattern` only on a candidate that genuinely fits. Picking none is a valid result,
+  and the right one when `list_patterns` returns no candidates.
+- Say which pattern you chose (or that none fits) and why, in one or two sentences.
 - List every deviation from the pattern and the reason (e.g. "no reranker: corpus is 200
   docs").
 - If nothing fits, say so and design from first principles; do not force a pattern.

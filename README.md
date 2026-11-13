@@ -89,10 +89,15 @@ Diagram error codes: `EMPTY_SOURCE`, `SOURCE_TOO_LARGE`, `UNKNOWN_DIAGRAM_TYPE`,
 
 ### Pattern library
 
-Eight opinionated reference architectures in [patterns/](patterns/): RAG app, multi-tenant
-SaaS, event-driven pipeline, agent system with tools, mobile app + API backend, data/ML
-pipeline, realtime collaboration app, internal admin tool. Each has trade-offs, at least
-three failure modes with mitigations, what not to use it for, and a render-tested diagram.
+Nine opinionated reference architectures in [patterns/](patterns/): RAG app, multi-tenant
+SaaS, two-sided marketplace, event-driven pipeline, agent system with tools, mobile app + API
+backend, data/ML pipeline, realtime collaboration app, internal admin tool. Each has
+trade-offs, at least three failure modes with mitigations, what not to use it for, and a
+render-tested diagram.
+
+`list_patterns` ranks by keyword overlap, not by fit. It returns the top candidates with a note
+telling the model to judge fit itself, and returns none ("design from first principles") when
+even the best match is weak. The skill reads the top 3 and may pick none.
 
 ## Install
 
@@ -211,12 +216,12 @@ retrieval has its own eval: `npm run eval:retrieval` ([results](evals/retrieval/
 ## Limitations
 
 - **Greenfield only.** It plans new projects; it does not read an existing codebase.
-- **Pattern retrieval is keyword-based and always returns a best match.** On its own 20
-  labeled queries it scores 90% top-1, but those were written alongside the patterns. On the
-  10 eval ideas, 4 got a poor-fit pattern (for example, the tutor marketplace got the RAG
-  pattern because there is no marketplace pattern). In 3 of those 4 plans the model
-  explicitly rejected or narrowed the pattern; the fourth did not mention it. A relevance
-  threshold is needed.
+- **Pattern retrieval is keyword-based.** On 22 labeled queries the default retriever scores
+  91% top-1 and 95% top-3, but those queries were written alongside the patterns. In the
+  last full eval (before the marketplace pattern and the top-3 change), 4 of 10 ideas got a
+  poor-fit top match; in 3 of those the model rejected it. The relevance floor only applies
+  when even the best match is weak, so the model's own judgment of the top 3 is still the
+  main safeguard. The eval has not been rerun since this change.
 - **Mermaid only.** D2 and Excalidraw are possible behind the renderer interface but not
   built.
 - **Slow renders.** Every validation or render launches headless Chromium: about 2 to 4
@@ -228,9 +233,8 @@ retrieval has its own eval: `npm run eval:retrieval` ([results](evals/retrieval/
 
 ## Roadmap
 
-- Relevance threshold for pattern retrieval, then an embeddings retriever (the
-  `PatternRetriever` interface is ready for it).
-- More patterns: marketplace, healthcare/regulated data, IoT telemetry.
+- An embeddings retriever (the `PatternRetriever` interface is ready for it).
+- More patterns: healthcare/regulated data, IoT telemetry.
 - A persistent browser for much faster validation.
 - Claude Code plugin packaging (skill + server in one install).
 - v2, once v1 has real users: existing-repo mode (tree-sitter structure extraction) and drift

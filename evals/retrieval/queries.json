@@ -78,5 +78,13 @@
   {
     "query": "Finance needs a tool to approve vendor payouts with an audit trail, only used by about twenty employees",
     "expected": "internal-admin-tool"
+  },
+  {
+    "query": "A platform where local handymen list their services, homeowners book a job, pay online, and the handyman gets paid after we take a 15% cut",
+    "expected": "marketplace"
+  },
+  {
+    "query": "Peer-to-peer camera gear rental: owners post equipment, renters reserve dates, deposits are held and both sides leave reviews",
+    "expected": "marketplace"
   }
 ]

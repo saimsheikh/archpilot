@@ -22,6 +22,12 @@ function fieldsOf(pattern: Pattern): WeightedField[] {
   ];
 }
 
+// If the best match scores below this, it rests on one or two incidental words (e.g. a single tag hit). Calibrated
+// on the retrieval queries and eval ideas: every correct top match scored 6 or more, while
+// the weakest poor fit scored 4. It applies to the best match only and does not catch every
+// poor fit, so the skill and harness show several candidates and let the model reject them.
+export const KEYWORD_MIN_SCORE = 5;
+
 /** Sums field weights for each distinct query token found in a pattern's metadata. */
 export class KeywordTagRetriever implements PatternRetriever {
   readonly name = "keyword+tags";
@@ -40,6 +46,6 @@ export class KeywordTagRetriever implements PatternRetriever {
       }
       return score;
     });
-    return rankByScore(this.patterns, scores, limit);
+    return rankByScore(this.patterns, scores, limit, KEYWORD_MIN_SCORE);
   }
 }

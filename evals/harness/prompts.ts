@@ -15,9 +15,24 @@ export const planSchema = z.object({
 export type Plan = z.infer<typeof planSchema>;
 
 export interface PlanningContext {
-  patternMarkdown: string | undefined;
+  /** Full markdown of the top retrieved patterns, best keyword match first. */
+  candidatePatterns: string[];
   forgottenConcerns: string;
   premortemGuide: string;
+}
+
+// Mirrors the skill: candidates are ranked by keyword overlap, so the model judges fit.
+function candidatesSection(candidates: readonly string[]): string {
+  if (candidates.length === 0) {
+    return "No reference architecture matched; design from first principles.";
+  }
+  return [
+    "Candidate reference architectures, ranked by keyword overlap (not by fit). Pick the one",
+    "that genuinely fits this project and adapt it, or use none. State your choice and the",
+    "deviations in architecture.decisions.",
+    "",
+    candidates.join("\n\n---\n\n"),
+  ].join("\n");
 }
 
 /** Plain prompt with no interview, checklist or validation: the comparison baseline. */
@@ -38,9 +53,7 @@ export function archpilotPrompt(idea: Idea, context: PlanningContext): string {
     "",
     `Project: ${idea.description}`,
     "",
-    context.patternMarkdown
-      ? `Closest reference architecture (adapt it, explain deviations in decisions):\n\n${context.patternMarkdown}`
-      : "No reference architecture matched; design from first principles.",
+    candidatesSection(context.candidatePatterns),
     "",
     "Check every concern below. Each must be handled by a component or decision, or noted",
     "as not needed with a reason:",

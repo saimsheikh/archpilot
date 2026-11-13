@@ -9,7 +9,7 @@ async function client() {
 describe("list_patterns", () => {
   it("lists every pattern without a query", async () => {
     const result = await callJson(await client(), "list_patterns", { limit: 20 });
-    expect((result.body.patterns as unknown[]).length).toBe(8);
+    expect((result.body.patterns as unknown[]).length).toBe(9);
   });
 
   it("ranks by relevance with a query", async () => {

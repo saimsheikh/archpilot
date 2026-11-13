@@ -36,7 +36,7 @@ try {
   const paths = files.map((file) => file.path);
   check(paths.includes("dist/index.js"), "tarball contains dist/index.js");
   check(paths.includes("skills/archpilot/SKILL.md"), "tarball contains the skill");
-  check(paths.filter((p) => p.startsWith("patterns/")).length === 8, "tarball contains 8 patterns");
+  check(paths.filter((p) => p.startsWith("patterns/")).length === 9, "tarball contains 9 patterns");
   check(
     !paths.some((p) => p.startsWith("tests/") || p.startsWith("evals/") || p.startsWith("src/")),
     "tarball excludes src, tests and evals",

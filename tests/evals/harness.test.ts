@@ -14,7 +14,7 @@ import { SAMPLE_ARCHITECTURE } from "../helpers/sample-architecture.js";
 
 const IDEA: Idea = { id: "demo", kind: "SaaS", description: "A recipe app" };
 const CONTEXT: PlanningContext = {
-  patternMarkdown: undefined,
+  candidatePatterns: [],
   forgottenConcerns: "",
   premortemGuide: "",
 };

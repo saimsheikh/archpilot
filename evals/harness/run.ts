@@ -55,8 +55,8 @@ const forgottenConcerns = await references("forgotten-concerns.md");
 const premortemGuide = await references("premortem.md");
 
 function contextFor(idea: Idea): PlanningContext {
-  const best = retriever.search(idea.description, 1)[0];
-  return { patternMarkdown: best?.pattern.body, forgottenConcerns, premortemGuide };
+  const candidates = retriever.search(idea.description, 3).map((ranked) => ranked.pattern.body);
+  return { candidatePatterns: candidates, forgottenConcerns, premortemGuide };
 }
 
 const conditions = new EvalConditions(

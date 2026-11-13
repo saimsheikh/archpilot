@@ -13,6 +13,7 @@ const EXPECTED_IDS = [
   "data-ml-pipeline",
   "event-driven-pipeline",
   "internal-admin-tool",
+  "marketplace",
   "mobile-api-backend",
   "multi-tenant-saas",
   "rag-app",
@@ -20,7 +21,7 @@ const EXPECTED_IDS = [
 ];
 
 describe("bundled patterns", () => {
-  it("contains the 8 v1 reference architectures", () => {
+  it("contains the 9 reference architectures", () => {
     expect(patterns.map((p) => p.meta.id)).toEqual(EXPECTED_IDS);
   });
 
