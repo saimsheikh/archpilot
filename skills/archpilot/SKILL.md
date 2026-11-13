@@ -78,9 +78,11 @@ Produce, in chat, a concise draft:
 
 - **Components**: name, responsibility, technology. Prefer boring, managed technology
   unless an answer from the interview demands otherwise.
-- **Data flow**: numbered steps for the main request path and the main write path.
-- **Key decisions**: for each, the choice, why, the trade-off, and the alternatives you
-  rejected and why.
+- **Data flow**: numbered steps for the main request path and the main write path. Steps are
+  numbered for you in `ARCHITECTURE.md`; do not prefix them with "Step 1:" or similar.
+- **Key decisions**: for each, a short heading (3 to 8 words, e.g. "Postgres exclusion
+  constraints for bookings"), then why, the trade-off, and the alternatives you rejected
+  and why. Details belong in the rationale, not the heading.
 
 Walk through [references/forgotten-concerns.md](references/forgotten-concerns.md) and make
 sure each concern is either handled by a component/decision or explicitly marked "not needed
@@ -103,7 +105,9 @@ do not reopen the whole interview.
 ### 5. Diagram with a repair loop
 
 Write a Mermaid `flowchart` (or C4/sequence if it fits better) of the components and data
-flow, then call `validate_diagram`.
+flow. Before validating, check that every component from step 3 has a node. A part that
+lives inside another component (e.g. an encryption layer inside the API) goes in that
+node's label instead of being left out. Then call `validate_diagram`.
 
 On error, read `code`, `line` and `hint`, fix that exact problem, and validate again:
 

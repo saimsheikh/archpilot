@@ -81,6 +81,15 @@ describe("render_diagram", () => {
 });
 
 describe("export_architecture_md", () => {
+  it("publishes writing guidance in its input schema, where the model reads it", async () => {
+    const { client } = await setup();
+    const tool = (await client.listTools()).tools.find((t) => t.name === "export_architecture_md");
+    const schema = JSON.stringify(tool?.inputSchema);
+    expect(schema).toContain("Short heading, about 3 to 8 words");
+    expect(schema).toContain("no 'Step 1:'");
+    expect(schema).toContain("must also appear as a node in the diagram");
+  });
+
   it("writes ARCHITECTURE.md with a diagram link relative to the doc", async () => {
     const { client, root } = await setup();
     const result = await callJson(client, "export_architecture_md", {

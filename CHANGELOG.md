@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - New `marketplace` reference pattern (two-sided marketplaces with payouts, booking, reviews).
 - `list_patterns` returns a `note`: judge fit yourself, or design from first principles when
   nothing matches. The keyword retriever returns no candidates when even its best match is weak.
 - Skill and eval harness consider the top 3 candidates and may pick none, instead of trusting #1.
+- Clearer ARCHITECTURE.md: the export schema and the skill ask for short decision headings,
+  unprefixed data-flow steps, and a diagram node for every component (guidance, not enforced).
 - Output paths treat `\` as a separator on every OS, so `..\x` is rejected on Linux too.
 
 ## 0.1.1

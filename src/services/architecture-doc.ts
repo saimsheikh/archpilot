@@ -14,15 +14,27 @@ export const architectureDocSchema = z.object({
       }),
     )
     .min(1)
-    .max(50),
+    .max(50)
+    .describe("Every component must also appear as a node in the diagram"),
   dataFlow: z
-    .array(z.object({ from: text(120), to: text(120), description: text(1000) }))
+    .array(
+      z.object({
+        from: text(120),
+        to: text(120),
+        description: text(1000).describe(
+          "What happens in this step. Steps are numbered automatically: no 'Step 1:' or 'Booking 2:' prefixes",
+        ),
+      }),
+    )
     .max(100)
     .default([]),
   decisions: z
     .array(
       z.object({
-        decision: text(300),
+        // Guidance, not a hard limit: older recorded eval runs have long titles and must replay.
+        decision: text(300).describe(
+          "Short heading, about 3 to 8 words, e.g. 'Postgres exclusion constraints for bookings'. Details go in rationale",
+        ),
         rationale: text(2000),
         tradeoffs: text(2000),
         alternativesRejected: z.array(text(500)).max(10).default([]),

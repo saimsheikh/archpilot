@@ -1,6 +1,6 @@
 {
   "name": "archpilot-mcp",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Plan before you code: an MCP server + Claude Code skill that interviews you, runs a pre-mortem, and writes a validated architecture diagram and ARCHITECTURE.md contract.",
   "keywords": [
     "mcp",
