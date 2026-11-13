@@ -80,7 +80,9 @@ export async function resolveOutputPath(
   }
 
   const realRoot = await realpath(projectRoot);
-  const target = resolve(realRoot, requested);
+  // Models often send Windows-style paths; treat "\" as a separator on every OS so
+  // "..\x" is rejected as traversal on Linux too, not written as a file named "..\x".
+  const target = resolve(realRoot, requested.replace(/\\/g, "/"));
   if (!isInside(realRoot, target)) return outside(requested);
 
   // Symlinks are resolved on the deepest existing ancestor, so a link pointing out of the
